@@ -31,6 +31,7 @@ Owners are `TBD` until someone is assigned.
 | D-012 | Project location (own folder and git repo) | Done | Project owner | — |
 | D-013 | Rate limiting deferred past M1 | Proposed | TBD | M5 |
 | D-014 | Classifier category set | Accepted | Anoushka Lalwani | — |
+| D-015 | Special-handling categories **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 
 ---
 
@@ -191,3 +192,11 @@ Owners are `TBD` until someone is assigned.
 - **M1 choice:** `Category` in `backend/safety/classifier.py` uses the §6.3 approved and restricted categories plus `unclassifiable`. §7.2's "sensitive disclosure" is carried by `requires_special_handling`, which always blocks and purges session context.
 - **Recommendation:** Confirm or revise this mapping before the M2 classifier is built, since the adversarial suite's expected outcomes depend on it.
 - **Decision:** M1 mapping confirmed as is by Anoushka Lalwani, project owner, 2026-11-04. The adversarial suite labels expected outcomes against these categories.
+
+## D-015 — Special-handling categories **[safety]**
+
+- **Status:** Accepted, safety sign-off pending
+- **PRD refs:** §7.4, §8.1
+- **Question:** Which restricted categories count as sensitive disclosures, so that they always set `requires_special_handling` (block and wipe session context) whichever layer flags them?
+- **Choice:** abuse or unsafe situations, bullying and mistreatment, self-harm, and personal information, matching the PRD §7.4 examples. The LLM judge may also set the flag for other inputs; no layer can clear it.
+- **Decision:** Approved by Anoushka Lalwani, project owner, 2026-11-04, as part of the M2 plan. Child-safety reviewer sign-off still required.

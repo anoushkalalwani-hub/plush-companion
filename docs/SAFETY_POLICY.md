@@ -12,6 +12,10 @@ PRD §15.2: agents must not invent safety policies. This file defines the *struc
 | Sensitive-disclosure protocol | Unreviewed | TBD (child-safety professional) | — |
 | Response templates | Unreviewed | TBD (child-safety professional) | — |
 | Generic fallback | Unreviewed | TBD | — |
+| Input rule phrases and patterns (`backend/safety/rules.py`) | Unreviewed, agent-drafted | TBD | — |
+| Output banned phrases and limits (`backend/safety/output_rules.py`) | Unreviewed, agent-drafted | TBD | — |
+| Classifier and validator judge prompts (`backend/safety/judge_prompts.py`) | Unreviewed, agent-drafted | TBD | — |
+| Special-handling categories (D-015) | Owner-approved, safety sign-off pending | TBD | — |
 
 ## Policy version
 
@@ -36,7 +40,11 @@ Proceed to generation (`allow`), subject to output validation.
 
 ## Restricted categories (PRD §6.3)
 
-Each needs a defined decision, template, and tests. Decisions below are **TBD — human approval required.**
+Each needs a defined decision, template, and tests. Decisions below are **TBD — human approval required.** Until then the policy engine blocks every restricted category with the generic fallback.
+
+**Special handling (D-015):** abuse or unsafe situations, bullying and mistreatment, self-harm, and personal information always set `requires_special_handling`, which blocks the message and wipes session context, whichever classifier layer flagged them.
+
+**How the layers combine (D-005):** keyword and pattern rules, moderation, and the LLM judge each label the input. Any restricted flag from rules or moderation overrides an approved judge label and forces high risk; if several categories are flagged, the most severe (order in `SEVERITY_ORDER`, `backend/safety/classifier.py`) is logged. The rule lists can only make the result stricter.
 
 | Category | Decision | Template ID | Session purge | Tests |
 |---|---|---|---|---|
@@ -76,6 +84,8 @@ Example from the PRD (unreviewed):
 The device also needs its own offline fallback, stored on the device, for when the backend is unreachable.
 
 ## Output validation checks (PRD §7.5)
+
+Implemented in three parts (D-006), all of which must pass: deterministic rules (length, sentence count, personal information patterns, banned phrases), moderation of the reply, and an LLM judge that sees only the reply and its category and reports each check below.
 
 - Age appropriateness.
 - Restricted content.

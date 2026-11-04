@@ -27,7 +27,7 @@ These hold for every code path. Tests in `tests/safety/` enforce them.
 
 1. **Every input is classified.** No message reaches the policy engine without a classification result, and a missing, failed, timed-out, or malformed classification is treated as "cannot decide."
 2. **The policy engine is deterministic.** Given the same classification results and policy version, it returns the same decision. It never calls an LLM.
-3. **Generation only after `allow`.** `conversation_manager` is the only module that calls `LLMProvider.generate`, and only after the policy engine returns `allow`.
+3. **Generation only after `allow`.** `conversation_manager` is the only module that calls `LLMProvider.generate`, and only after the policy engine returns `allow`. `JudgeModel.judge` (labelling calls whose output is parsed into fixed labels and never spoken) is called only by the layered classifier and validator.
 4. **Nothing unvalidated is spoken.** Only text that has passed output validation is sent to TTS. No partial or streamed generated text reaches TTS.
 5. **Failed responses are discarded, not repaired.** If validation fails, the response is dropped and a predefined fallback is used.
 6. **Fail closed.** Any exception, timeout, or unavailable service in steps 1–5 results in a predefined fallback response, never a generated one.
@@ -52,9 +52,12 @@ Each module gets a documented interface and its own tests (PRD §5.2). Provider-
 | Module | Location | Interface | Status |
 |---|---|---|---|
 | `llm_provider` | `backend/llm/base.py` | `async LLMProvider.generate(messages, constraints) -> GenerationResult` | Interface + fake (M1) |
-| `intent_classifier` | `backend/safety/classifier.py` | `async classify(text) -> ClassificationResult` | Interface + stub (M1) |
+| `intent_classifier` | `backend/safety/classifier.py`, `layered_classifier.py` | `async classify(text) -> ClassificationResult` | Three layers (D-005), not yet wired into the app (M2) |
+| input rules | `backend/safety/rules.py` | `match_input_rules(text) -> set[Category]` | Implemented, lists unreviewed (M2) |
+| moderation | `backend/safety/moderation.py` | `async ModerationProvider.moderate(text) -> ModerationResult` | Interface (M2); OpenAI adapter in PR C |
+| judge | `backend/llm/base.py`, `backend/safety/judge_prompts.py` | `async JudgeModel.judge(instructions, content, schema) -> dict` | Interface + draft prompts (M2); OpenAI adapter in PR C |
 | `safety_engine` | `backend/safety/policy_engine.py` | `decide(classification, config) -> PolicyOutcome` | Implemented (M1) |
-| `response_validator` | `backend/safety/validator.py` | `async validate(text, category) -> ValidationResult` | Interface + stub (M1) |
+| `response_validator` | `backend/safety/validator.py`, `layered_validator.py`, `output_rules.py` | `async validate(text, category) -> ValidationResult` | Rules + moderation + judge (D-006), not yet wired into the app (M2) |
 | templates | `backend/safety/templates.py` | Predefined responses with review status | Generic fallback only (unreviewed) |
 | `conversation_manager` | `backend/conversation/manager.py` | `async handle_message(session, text) -> Reply` | Implemented (M1) |
 | `session_manager` | `backend/sessions/store.py` | In-memory session context with TTL (D-008) | Implemented (M1) |
