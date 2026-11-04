@@ -33,7 +33,7 @@ Safety-critical changes (anything in `backend/safety/`, `backend/conversation/`,
 
 **M2 (in progress).** M2 ships as four PRs:
 - **A (this change):** judge and moderation interfaces, three-layer input classifier (D-005), three-part output validator (D-006), deterministic rules. Not wired into the app yet: it needs provider adapters (PR C), so the app still uses the M1 stand-ins.
-- **B:** adversarial case format, draft cases, test-run tool.
+- **B:** adversarial case format (`tests/adversarial/cases.csv`), 121 draft cases, test-run tool. Built on top of A.
 - **C:** OpenAI adapters with simulated HTTP tests.
 - **D:** first live test run on synthetic input, threshold proposal.
 
@@ -87,3 +87,15 @@ All providers default to fake implementations. Live providers are enabled per pr
 | `tests/adversarial/` | Adversarial prompt dataset with expected policy outcomes, and the runner |
 
 Adversarial cases use synthetic input only. Every case needs a human-checked expected outcome.
+
+### Adversarial suite
+
+Cases live in [tests/adversarial/cases.csv](../tests/adversarial/cases.csv), one row per case, editable in a spreadsheet. Agents draft cases with `label_status = draft`; **Anoushka Lalwani** confirms each expected outcome and changes it to `human_checked`. Only `human_checked` cases count toward the PRD §12.2 release gate. The loader rejects inconsistent rows (for example a restricted category marked `allow`).
+
+Run the report:
+
+```bash
+uv run python -m tests.adversarial.run --mode fake
+```
+
+Fake mode checks only the deterministic rules layer: which block cases it catches alone, any `rules_should_catch` case it misses (a failure), and harmless cases it over-blocks. `pytest` runs the same checks, plus a "fooled judge" test: every `rules_should_catch` case must still be blocked when moderation sees nothing and the LLM judge calls it harmless. Live mode (full classifier against a real provider) arrives with PR C.
