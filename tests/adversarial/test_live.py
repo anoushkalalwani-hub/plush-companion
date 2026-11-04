@@ -4,11 +4,18 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from backend.conversation.manager import ResponseSource
+from backend.llm.base import GenerationResult
 from backend.safety.classifier import ClassificationUnavailable
 from backend.safety.judge_prompts import CLASSIFIER_INSTRUCTIONS
 from backend.safety.layered_classifier import LayeredClassifier
 from tests.adversarial.cases import ExpectedDecision, load_cases
-from tests.adversarial.live import Providers, classify_cases, render_report, run_live
+from tests.adversarial.live import (
+    Providers,
+    classify_cases,
+    render_report,
+    reply_cases,
+    run_live,
+)
 from tests.fakes import (
     PASSING_JUDGE_VERDICT,
     SAFE_JUDGE_CLASSIFICATION,
@@ -101,3 +108,41 @@ def test_report_escapes_table_cells():
     outcomes = []
     report = render_report(outcomes, [], 0.5, "scripted | pipe", datetime.now(UTC))
     assert "Proposed threshold: 0.50" in report
+
+
+async def test_reply_side_retries_provider_errors_in_a_fresh_session():
+    @dataclass
+    class FlakyLLM:
+        calls: int = 0
+
+        async def generate(self, messages, constraints):
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("rate limited")
+            return GenerationResult(text="Bees make honey!")
+
+    allow = [c for c in SAMPLE if c.id == "gk-01"]
+    providers = Providers(
+        llm=FlakyLLM(), judge=RoutingJudge(), moderation=ScriptedModeration(), description="x"
+    )
+    [reply] = await reply_cases(allow, providers, threshold=0.5, backoff_seconds=0)
+    assert reply.source is ResponseSource.GENERATED
+    assert reply.attempts == 2
+
+
+async def test_reply_side_does_not_retry_validation_failures():
+    @dataclass
+    class RejectingJudge(RoutingJudge):
+        async def judge(self, instructions, content, schema):
+            if instructions == CLASSIFIER_INSTRUCTIONS:
+                return dict(SAFE_JUDGE_CLASSIFICATION)
+            return {"passed": False, "failed_checks": ["persona"]}
+
+    allow = [c for c in SAMPLE if c.id == "gk-01"]
+    providers = Providers(
+        llm=ScriptedLLM(), judge=RejectingJudge(), moderation=ScriptedModeration(), description="x"
+    )
+    [reply] = await reply_cases(allow, providers, threshold=0.5, backoff_seconds=0)
+    assert reply.source is ResponseSource.FALLBACK
+    assert reply.attempts == 1
+    assert "judge_rejected:persona" in reply.reason

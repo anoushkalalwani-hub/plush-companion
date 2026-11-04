@@ -46,6 +46,7 @@ class ReplyOutcome:
     reason: str
     text: str
     latency_ms: float
+    attempts: int = 1
 
 
 @dataclass(frozen=True)
@@ -64,11 +65,21 @@ class _RecordingAudit(AuditLogger):
         self.events[event.session_id] = event
 
 
+# Groq's free tier allows as little as 2,000 tokens a minute on the safeguard model, and its
+# token budget resets over 20 to 60 seconds, so retries back off up to a minute.
+DEFAULT_ATTEMPTS = 8
+MAX_BACKOFF_SECONDS = 60.0
+
+
+def _backoff(attempt: int, base: float) -> float:
+    return min(MAX_BACKOFF_SECONDS, base * 2 ** (attempt - 1))
+
+
 async def classify_cases(
     cases: Sequence[Case],
     classifier: LayeredClassifier,
     concurrency: int = 4,
-    attempts: int = 4,
+    attempts: int = DEFAULT_ATTEMPTS,
     backoff_seconds: float = 2.0,
 ) -> list[InputOutcome]:
     """Classify every case, retrying unavailability (usually rate limits) with backoff."""
@@ -82,15 +93,25 @@ async def classify_cases(
                     return InputOutcome(case=case, final=final, layers=layers, attempts=attempt)
                 except ClassificationUnavailable:
                     if attempt < attempts:
-                        await asyncio.sleep(backoff_seconds * 2 ** (attempt - 1))
+                        await asyncio.sleep(_backoff(attempt, backoff_seconds))
             return InputOutcome(case=case, final=None, layers=None, attempts=attempts)
 
     return list(await asyncio.gather(*(one(c) for c in cases)))
 
 
 async def reply_cases(
-    cases: Sequence[Case], providers: Providers, threshold: float, concurrency: int = 2
+    cases: Sequence[Case],
+    providers: Providers,
+    threshold: float,
+    concurrency: int = 2,
+    attempts: int = DEFAULT_ATTEMPTS,
+    backoff_seconds: float = 2.0,
 ) -> list[ReplyOutcome]:
+    """Run each case through the real conversation manager.
+
+    A fallback caused by a provider error (usually a rate limit) is retried in a fresh session.
+    Timeouts and validation failures are product behaviour and are reported, not retried.
+    """
     settings = Settings.from_env()
     sessions = SessionStore(
         max_turns=settings.session_max_turns,
@@ -110,17 +131,23 @@ async def reply_cases(
 
     async def one(case: Case) -> ReplyOutcome:
         async with gate:
-            session = sessions.create(device_id=EVAL_DEVICE_ID)
-            started = time.monotonic()
-            reply = await manager.handle_message(session, case.input)
-            event = audit.events[session.id]
-            return ReplyOutcome(
-                case=case,
-                source=reply.source,
-                reason=f"{event.stage}:{event.reason}",
-                text=reply.text,
-                latency_ms=round((time.monotonic() - started) * 1000),
-            )
+            for attempt in range(1, attempts + 1):
+                session = sessions.create(device_id=EVAL_DEVICE_ID)
+                started = time.monotonic()
+                reply = await manager.handle_message(session, case.input)
+                event = audit.events[session.id]
+                provider_error = "error:" in event.reason
+                if not provider_error or attempt == attempts:
+                    return ReplyOutcome(
+                        case=case,
+                        source=reply.source,
+                        reason=f"{event.stage}:{event.reason}",
+                        text=reply.text,
+                        latency_ms=round((time.monotonic() - started) * 1000),
+                        attempts=attempt,
+                    )
+                await asyncio.sleep(_backoff(attempt, backoff_seconds))
+            raise AssertionError("unreachable")
 
     return list(await asyncio.gather(*(one(c) for c in cases)))
 
@@ -251,6 +278,7 @@ def render_report(
         f"- **Generated and passed validation:** {sources[ResponseSource.GENERATED]} / "
         f"{len(replies)}",
         f"- **Fell back:** {sources[ResponseSource.FALLBACK]}",
+        f"- **Retries used after provider errors:** {sum(r.attempts - 1 for r in replies)}",
         "",
     ]
     if reasons:
@@ -267,13 +295,24 @@ def render_report(
 
 
 async def run_live(
-    cases: Sequence[Case], providers: Providers, concurrency: int = 4
+    cases: Sequence[Case],
+    providers: Providers,
+    concurrency: int = 4,
+    backoff_seconds: float = 2.0,
 ) -> tuple[str, list[InputOutcome], float]:
     started = datetime.now(UTC)
     classifier = LayeredClassifier(moderation=providers.moderation, judge=providers.judge)
-    inputs = await classify_cases(cases, classifier, concurrency=concurrency)
+    inputs = await classify_cases(
+        cases, classifier, concurrency=concurrency, backoff_seconds=backoff_seconds
+    )
     threshold = propose_threshold(inputs)
     allow_cases = [c for c in cases if c.expected_decision is ExpectedDecision.ALLOW]
-    replies = await reply_cases(allow_cases, providers, threshold)
+    replies = await reply_cases(
+        allow_cases,
+        providers,
+        threshold,
+        concurrency=max(1, concurrency // 2),
+        backoff_seconds=backoff_seconds,
+    )
     report = render_report(inputs, replies, threshold, providers.description, started)
     return report, inputs, threshold
