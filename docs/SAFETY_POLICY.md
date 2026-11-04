@@ -15,6 +15,7 @@ PRD §15.2: agents must not invent safety policies. This file defines the *struc
 | Input rule phrases and patterns (`backend/safety/rules.py`) | Unreviewed, agent-drafted | TBD | — |
 | Output banned phrases and limits (`backend/safety/output_rules.py`) | Unreviewed, agent-drafted | TBD | — |
 | Classifier and validator judge prompts (`backend/safety/judge_prompts.py`) | Unreviewed, agent-drafted | TBD | — |
+| Moderation policy for the safeguard model (`backend/safety/moderation_policy.py`, D-016) | Unreviewed, agent-drafted | TBD | — |
 | Special-handling categories (D-015) | Owner-approved, safety sign-off pending | TBD | — |
 
 ## Policy version

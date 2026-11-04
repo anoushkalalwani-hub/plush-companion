@@ -32,6 +32,7 @@ Owners are `TBD` until someone is assigned.
 | D-013 | Rate limiting deferred past M1 | Proposed | TBD | M5 |
 | D-014 | Classifier category set | Accepted | Anoushka Lalwani | — |
 | D-015 | Special-handling categories **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
+| D-016 | AI provider: Groq instead of OpenAI | Accepted | Anoushka Lalwani | — |
 
 ---
 
@@ -101,7 +102,32 @@ Owners are `TBD` until someone is assigned.
   2. With ZDR, the LLM provider adapter must send `store=false` (Responses API) and must not rely on any stored state.
   3. Parental consent (D-002) is required by OpenAI's terms, not just by law.
   4. If the pilot is in the EU or UK, use EU processing. Transcription and text-to-speech support it.
-- **Next steps (owner):** request ZDR and a DPA from OpenAI sales, ask them to confirm the under-13 terms conflict above, and re-read the Usage Policies after 2026-11-20.
+- **Next steps (owner):** request ZDR and a DPA from OpenAI sales, ask them to confirm the under-13 terms conflict above, and re-read the Usage Policies after 2026-11-20. *(Superseded for now by D-016: the project uses Groq. Kept for reference if OpenAI is added later.)*
+- **Findings: Groq / GroqCloud (researched 2026-11-04; a summary, not legal advice):**
+  - **Under-13 use: allowed with conditions.**
+    - The [Services Agreement](https://console.groq.com/docs/legal/services-agreement) (last modified 2026-06-22) §2 requires the account holder to be 18 or older.
+    - §6.3 makes the customer solely responsible for legal compliance when an app is directed at or likely used by minors, including collecting their personal data. It does not mention COPPA or parental consent; that burden is ours (D-002).
+    - The [AUP](https://console.groq.com/docs/legal/ai-policy) requires human oversight, testing and use-case-specific safeguards. Its only children's clause bans child sexual abuse or exploitation.
+    - Groq's own Privacy Policy ("not directed to children") covers Groq's users, not customer data it processes.
+  - **Retention and training ([your-data](https://console.groq.com/docs/your-data)):**
+    - Inference data is not retained by default, but may be logged for up to 30 days for reliability and abuse checks.
+    - **ZDR is self-serve:** Console → Settings → Data Controls. No contract needed. ZDR still allows access for service operation and AUP enforcement.
+    - Inputs and outputs are not used for training (Services Agreement §4.2).
+  - **DPA:** automatically part of the Services Agreement ([DPA](https://console.groq.com/docs/legal/customer-data-processing-addendum)). It includes EU SCCs and the UK addendum, and has no children's clause. Stored data is in the US; processing is in the US and subprocessor countries. The Trust Center could not be read, so certifications are unverified.
+  - **Capabilities:**
+
+    | Need | Groq option | Status |
+    |---|---|---|
+    | Reply generation, AI judge | `openai/gpt-oss-20b`, `openai/gpt-oss-120b`, strict JSON schema | Production |
+    | Speech-to-text | `whisper-large-v3-turbo`, `whisper-large-v3` (each request billed as at least 10 s) | Production |
+    | Moderation | No moderation endpoint; `openai/gpt-oss-safeguard-20b` with a policy we write | **Preview** |
+    | Text-to-speech | `canopylabs/orpheus-v1-english`, WAV, 200 characters per request | **Preview** |
+
+  - **Retired models:** Llama Guard 4 (2026-03-05), the `llama-3.x` chat models (2026-08-16 on standard tiers), and PlayAI TTS. Use only `gpt-oss` models for chat.
+- **Groq next steps (owner):**
+  1. Confirm the account holder is 18 or older.
+  2. Turn on ZDR for the organization before any real child's speech is sent.
+  3. Re-check the model list before the pilot, because preview models can be withdrawn.
 - **Decision:** —
 
 ## D-004 — Sensitive-disclosure response templates **[safety]**
@@ -200,3 +226,15 @@ Owners are `TBD` until someone is assigned.
 - **Question:** Which restricted categories count as sensitive disclosures, so that they always set `requires_special_handling` (block and wipe session context) whichever layer flags them?
 - **Choice:** abuse or unsafe situations, bullying and mistreatment, self-harm, and personal information, matching the PRD §7.4 examples. The LLM judge may also set the flag for other inputs; no layer can clear it.
 - **Decision:** Approved by Anoushka Lalwani, project owner, 2026-11-04, as part of the M2 plan. Child-safety reviewer sign-off still required.
+
+## D-016 — AI provider: Groq instead of OpenAI
+
+- **Status:** Accepted
+- **PRD refs:** §5.1 ("Hosted OpenAI API initially"), §6.1
+- **Conflict:** PRD §5.1 names OpenAI as the first provider. The project owner asked to use Groq instead. The PRD requires providers to be swappable behind interfaces, and no OpenAI code had been written.
+- **Choice:** All Groq. Reply generation, the AI judge (D-005 layer 3, D-006) and moderation (D-005 layer 2, D-006) all run on GroqCloud's OpenAI-compatible API. Speech is decided in M3.
+- **Trade-offs accepted:**
+  - Groq has no purpose-built moderation endpoint. The moderation layer uses the **preview** model `openai/gpt-oss-safeguard-20b` with a policy we write (`backend/safety/moderation_policy.py`, unreviewed). That makes it less independent from the AI judge than a dedicated moderation service. The first live run (PR D) measures it, and an OpenAI moderation adapter can be added behind the same interface if it underperforms.
+  - Preview models can be withdrawn at short notice. Because the system fails closed, that would turn every reply into the fallback until another model is configured.
+  - Text-to-speech on Groq is preview-only with a 200-character limit. Decided in M3.
+- **Decision:** Groq, all capabilities, chosen by Anoushka Lalwani, project owner, 2026-11-04. Provider findings are in D-003.

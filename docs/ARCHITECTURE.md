@@ -54,8 +54,8 @@ Each module gets a documented interface and its own tests (PRD §5.2). Provider-
 | `llm_provider` | `backend/llm/base.py` | `async LLMProvider.generate(messages, constraints) -> GenerationResult` | Interface + fake (M1) |
 | `intent_classifier` | `backend/safety/classifier.py`, `layered_classifier.py` | `async classify(text) -> ClassificationResult` | Three layers (D-005), not yet wired into the app (M2) |
 | input rules | `backend/safety/rules.py` | `match_input_rules(text) -> set[Category]` | Implemented, lists unreviewed (M2) |
-| moderation | `backend/safety/moderation.py` | `async ModerationProvider.moderate(text) -> ModerationResult` | Interface (M2); OpenAI adapter in PR C |
-| judge | `backend/llm/base.py`, `backend/safety/judge_prompts.py` | `async JudgeModel.judge(instructions, content, schema) -> dict` | Interface + draft prompts (M2); OpenAI adapter in PR C |
+| moderation | `backend/safety/moderation.py` | `async ModerationProvider.moderate(text) -> ModerationResult` | Interface (M2); Groq safeguard adapter in `backend/llm/groq.py` with policy in `backend/safety/moderation_policy.py` (D-016) |
+| judge | `backend/llm/base.py`, `backend/safety/judge_prompts.py` | `async JudgeModel.judge(instructions, content, schema) -> dict` | Interface + draft prompts (M2); Groq adapter in `backend/llm/groq.py` (D-016) |
 | `safety_engine` | `backend/safety/policy_engine.py` | `decide(classification, config) -> PolicyOutcome` | Implemented (M1) |
 | `response_validator` | `backend/safety/validator.py`, `layered_validator.py`, `output_rules.py` | `async validate(text, category) -> ValidationResult` | Rules + moderation + judge (D-006), not yet wired into the app (M2) |
 | templates | `backend/safety/templates.py` | Predefined responses with review status | Generic fallback only (unreviewed) |

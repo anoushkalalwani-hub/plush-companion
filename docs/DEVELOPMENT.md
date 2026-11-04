@@ -34,7 +34,7 @@ Safety-critical changes (anything in `backend/safety/`, `backend/conversation/`,
 **M2 (in progress).** M2 ships as four PRs:
 - **A (this change):** judge and moderation interfaces, three-layer input classifier (D-005), three-part output validator (D-006), deterministic rules. Not wired into the app yet: it needs provider adapters (PR C), so the app still uses the M1 stand-ins.
 - **B:** adversarial case format (`tests/adversarial/cases.csv`), 121 draft cases, test-run tool. Built on top of A.
-- **C:** OpenAI adapters with simulated HTTP tests.
+- **C:** Groq adapters (D-016) for reply generation, the judge and moderation, with simulated HTTP tests. The API app still refuses live mode.
 - **D:** first live test run on synthetic input, threshold proposal.
 
 **M1 (text-only pipeline): merged.** What ships by default:
