@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+# Never commit audio (PRD §8.1)
+*.wav
+*.mp3
+*.ogg
+*.flac

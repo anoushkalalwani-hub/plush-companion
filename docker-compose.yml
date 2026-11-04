@@ -1,0 +1,15 @@
+# Local development services. The backend service is added in M1.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: plush
+      POSTGRES_PASSWORD: plush
+      POSTGRES_DB: plush
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+volumes:
+  db-data:
