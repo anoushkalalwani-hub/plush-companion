@@ -9,3 +9,11 @@ __pycache__/
 *.mp3
 *.ogg
 *.flac
+
+# Private configuration
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
