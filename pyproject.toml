@@ -1,0 +1,34 @@
+[project]
+name = "plush-companion"
+version = "0.1.0"
+description = "AI Plush Companion backend and device runtime"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "uvicorn",
+]
+
+[dependency-groups]
+dev = [
+    "httpx",
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: initial draft (M0). Describes the intended design; nothing below is implemented yet.
+Status: M1. The text pipeline, policy engine, session store, audit events, and conversation API are implemented. Classifier and validator are stubs that fail closed; speech, device auth, and the database come later (see [DEVELOPMENT.md](DEVELOPMENT.md#milestone-status)).
 
 Source of truth: [PRD.md](PRD.md) §3, §5, §7. Open questions: [DECISIONS.md](DECISIONS.md).
 
@@ -45,23 +45,23 @@ The policy engine returns one of:
 
 Restricted categories (PRD §6.3) map to `template` or `block` according to [SAFETY_POLICY.md](SAFETY_POLICY.md).
 
-## Module interfaces (planned)
+## Module interfaces
 
-Each module gets a documented interface and its own tests (PRD §5.2). Provider-specific code lives only in provider adapters.
+Each module gets a documented interface and its own tests (PRD §5.2). Provider-specific code lives only in provider adapters. Stage interfaces are async because real implementations call network services; the conversation manager enforces every stage's timeout itself with `asyncio.wait_for`, so a provider that ignores its timeout still fails closed.
 
-| Module | Folder | Interface sketch |
-|---|---|---|
-| `llm_provider` | `backend/llm/` | `LLMProvider.generate(messages, constraints) -> GenerationResult` |
-| `intent_classifier` | `backend/safety/classifier.py` | `classify(text) -> ClassificationResult` |
-| `safety_engine` | `backend/safety/policy_engine.py` | `decide(classifications, policy_version) -> PolicyDecision` |
-| `response_validator` | `backend/safety/validator.py` | `validate(text, category) -> ValidationResult` |
-| templates | `backend/safety/templates.py` | Predefined responses with review status |
-| `conversation_manager` | `backend/conversation/` | `handle_message(session, text) -> ApprovedResponse` |
-| `session_manager` | `backend/sessions/` | In-memory session context with TTL (D-008) |
-| `speech_service` / `tts_service` | `backend/speech/` | `transcribe(audio) -> text`, `synthesize(text) -> audio` |
-| `device_manager` / `authentication` | `backend/devices/`, `backend/auth/` | Device registration, credential checks, revocation |
-| `memory_manager` | `backend/memory/` | Disabled for MVP (PRD §8.1) |
-| `audit_logger` | `backend/api/` or shared | Metadata-only event logging |
+| Module | Location | Interface | Status |
+|---|---|---|---|
+| `llm_provider` | `backend/llm/base.py` | `async LLMProvider.generate(messages, constraints) -> GenerationResult` | Interface + fake (M1) |
+| `intent_classifier` | `backend/safety/classifier.py` | `async classify(text) -> ClassificationResult` | Interface + stub (M1) |
+| `safety_engine` | `backend/safety/policy_engine.py` | `decide(classification, config) -> PolicyOutcome` | Implemented (M1) |
+| `response_validator` | `backend/safety/validator.py` | `async validate(text, category) -> ValidationResult` | Interface + stub (M1) |
+| templates | `backend/safety/templates.py` | Predefined responses with review status | Generic fallback only (unreviewed) |
+| `conversation_manager` | `backend/conversation/manager.py` | `async handle_message(session, text) -> Reply` | Implemented (M1) |
+| `session_manager` | `backend/sessions/store.py` | In-memory session context with TTL (D-008) | Implemented (M1) |
+| `audit_logger` | `backend/audit/events.py` | `record(SafetyEvent)`, metadata only (D-009) | Implemented (M1) |
+| `speech_service` / `tts_service` | `backend/speech/` | `transcribe(audio) -> text`, `synthesize(text) -> audio` | M3 |
+| `device_manager` / `authentication` | `backend/devices/`, `backend/auth/` | Device registration, credential checks, revocation | M5 (dev token stub in `backend/api/routes.py`) |
+| `memory_manager` | `backend/memory/` | Disabled for MVP (PRD §8.1) | — |
 
 Every external provider has a fake implementation used by default in tests and local development.
 

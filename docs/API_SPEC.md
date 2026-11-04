@@ -1,6 +1,6 @@
 # API Specification
 
-Status: initial draft (M0). Endpoints are from PRD §11. Request and response shapes will be filled in as each endpoint is implemented.
+Status: M1. The three session endpoints are implemented (text input only). Other endpoints are from PRD §11 and not built yet.
 
 ## Rules for every endpoint
 
@@ -25,11 +25,27 @@ Status: initial draft (M0). Endpoints are from PRD §11. Request and response sh
 | PATCH | `/api/v1/parent/settings` | Update parent settings | Parent | Later |
 | DELETE | `/api/v1/parent/data` | Request eligible data deletion | Parent | M5 |
 
-In M1, device auth is a development stub; real credentials arrive in M5.
+In M1, device auth is a development stub: every request must send `Authorization: Bearer <DEV_DEVICE_TOKEN>`. If `DEV_DEVICE_TOKEN` is unset, every request is rejected with 401. Real per-device credentials arrive in M5 (D-010). Rate limiting is not implemented yet (D-013).
 
-## `POST /api/v1/sessions/{id}/message` (draft)
+## Errors
 
-Request (M1, text input):
+| Status | When | Body |
+|---|---|---|
+| 401 | Missing or wrong token | `{"detail": "Unauthorized"}` |
+| 404 | Session unknown, expired, deleted, or belongs to another device | `{"detail": "Not Found"}` |
+| 422 | Invalid body: unknown fields, empty or over 500 characters | `{"detail": "invalid request"}`, never echoing the input |
+
+## `POST /api/v1/sessions`
+
+Returns `201` with `{"session_id": "..."}`.
+
+## `DELETE /api/v1/sessions/{id}`
+
+Returns `204` and drops the session's in-memory context.
+
+## `POST /api/v1/sessions/{id}/message`
+
+Request (M1, text input, 1–500 characters, no other fields allowed):
 
 ```json
 { "text": "why is the sky blue?" }

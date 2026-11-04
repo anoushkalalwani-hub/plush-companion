@@ -29,6 +29,8 @@ Owners are `TBD` until someone is assigned.
 | D-010 | Device provisioning before the parent app exists | Proposed | TBD | M5 |
 | D-011 | Wake mechanism and mute switch implementation | Proposed | TBD | M4 |
 | D-012 | Project location (own folder and git repo) | Done | Project owner | — |
+| D-013 | Rate limiting deferred past M1 | Proposed | TBD | M5 |
+| D-014 | Classifier category set | Proposed | TBD | M2 |
 
 ---
 
@@ -135,3 +137,20 @@ Owners are `TBD` until someone is assigned.
 - **Context:** The project was first scaffolded as `plush-companion/` inside the `claude-test` workspace. On 2026-11-04, at the project owner's request, it was moved to its own folder at `/Users/anoushka/plush-companion`. It is not yet a git repository.
 - **Recommendation:** Initialize it as its own git repository before the first real code lands, so history, CI, and access control are separate from unrelated work.
 - **Decision:** Own folder: done 2026-11-04 (requested by the project owner). Git repository: initialized 2026-11-04 at the project owner's request, remote `https://github.com/anoushkalalwani-hub/plush-companion`.
+
+## D-013 — Rate limiting deferred past M1
+
+- **Status:** Proposed
+- **PRD refs:** §11 ("all endpoints must implement ... appropriate rate limiting")
+- **Conflict:** M1 implements the session endpoints without rate limiting. Meaningful limits are per device, and per-device identity does not exist until real credentials land (D-010).
+- **Recommendation:** Accept the gap for M1 and M2 (fake providers, development token, no real users). Add per-device rate limiting together with device credentials in M5, before any live provider is reachable from a real device.
+- **Decision:** —
+
+## D-014 — Classifier category set
+
+- **Status:** Proposed
+- **PRD refs:** §6.3, §7.2
+- **Gap:** §7.2 lists classifier intents (ordinary, educational, creative, personal information, sensitive disclosure, dangerous, medical, inappropriate, ambiguous), while §6.3 lists conversation categories. They overlap but don't match one to one.
+- **M1 choice:** `Category` in `backend/safety/classifier.py` uses the §6.3 approved and restricted categories plus `unclassifiable`. §7.2's "sensitive disclosure" is carried by `requires_special_handling`, which always blocks and purges session context.
+- **Recommendation:** Confirm or revise this mapping before the M2 classifier is built, since the adversarial suite's expected outcomes depend on it.
+- **Decision:** —

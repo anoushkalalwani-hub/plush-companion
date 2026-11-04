@@ -29,13 +29,47 @@ No real child uses the device before D-002 is resolved and M6 is approved.
 
 Safety-critical changes (anything in `backend/safety/`, `backend/conversation/`, templates, or the policy table) need human approval. Agents must not approve them.
 
+## Milestone status
+
+**M1 (text-only pipeline): built, awaiting review.** What ships by default:
+
+| Stage | M1 default | Effect |
+|---|---|---|
+| Input classifier | `StubClassifier`, always unavailable | Every message falls back |
+| Policy engine | Real and deterministic; confidence threshold unset | Blocks everything until a threshold is set from evaluation (D-005) |
+| LLM | `FakeLLMProvider` only; live mode refuses to start | No network calls |
+| Output validator | `StubValidator`, rejects everything | Generated text is never returned |
+| Restricted categories | Blocked with the generic fallback | Dedicated templates wait for D-004 |
+
+So the API always answers with the generic fallback until M2. Tests swap in allowing test doubles (`tests/fakes.py`) to exercise the full path. Those doubles live only under `tests/`.
+
+Known M1 limitations: no rate limiting (D-013), one shared development token instead of per-device credentials (D-010), no adversarial suite yet (M2), no PostgreSQL usage yet.
+
 ## Local development
 
-Not set up yet. Planned for M1:
+Requires [uv](https://docs.astral.sh/uv/). It installs Python 3.12 and the dependencies.
 
-- Python 3.12, FastAPI, Pytest, Ruff.
-- `docker compose up` for PostgreSQL.
-- All providers default to fake implementations. Live providers are enabled per provider through environment variables, and only after D-003 is answered for that provider.
+```bash
+uv sync
+```
+
+```bash
+uv run pytest
+```
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+```
+
+Run the API locally (every reply will be the fallback):
+
+```bash
+DEV_DEVICE_TOKEN=dev uv run uvicorn backend.main:create_app --factory --reload
+```
+
+`docker compose up` starts PostgreSQL, which is not used until M5.
+
+All providers default to fake implementations. Live providers are enabled per provider through environment variables, and only after D-003 is answered for that provider.
 
 ## Tests
 
@@ -43,7 +77,7 @@ Not set up yet. Planned for M1:
 |---|---|
 | `tests/unit/` | Per-module tests |
 | `tests/integration/` | API and pipeline tests with fake providers |
-| `tests/safety/` | Pipeline invariant tests (see [ARCHITECTURE.md](ARCHITECTURE.md)) and fail-closed tests |
+| `tests/safety/` | Pipeline invariant tests (see [ARCHITECTURE.md](ARCHITECTURE.md)), fail-closed tests, no-content-in-logs tests, session context rules |
 | `tests/adversarial/` | Adversarial prompt dataset with expected policy outcomes, and the runner |
 
 Adversarial cases use synthetic input only. Every case needs a human-checked expected outcome.
