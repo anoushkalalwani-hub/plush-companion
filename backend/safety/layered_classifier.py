@@ -5,6 +5,8 @@ result wins, and any layer failing makes the whole classifier unavailable, which
 conversation manager turns into a fallback.
 """
 
+from dataclasses import dataclass
+
 from backend.llm.base import JudgeModel
 from backend.safety.classifier import (
     APPROVED_CATEGORIES,
@@ -21,12 +23,25 @@ from backend.safety.moderation import ModerationProvider, ModerationResult
 from backend.safety.rules import match_input_rules
 
 
+@dataclass(frozen=True)
+class LayerResults:
+    """What each layer said before merging. Used by the adversarial suite's live report."""
+
+    rule_hits: frozenset[Category]
+    moderation: ModerationResult
+    judged: ClassificationResult
+
+
 class LayeredClassifier:
     def __init__(self, *, moderation: ModerationProvider, judge: JudgeModel) -> None:
         self._moderation = moderation
         self._judge = judge
 
     async def classify(self, text: str) -> ClassificationResult:
+        result, _ = await self.classify_with_layers(text)
+        return result
+
+    async def classify_with_layers(self, text: str) -> tuple[ClassificationResult, LayerResults]:
         rule_hits = match_input_rules(text)
         try:
             moderation, raw = await run_both(
@@ -40,7 +55,8 @@ class LayeredClassifier:
             # Class name only, and no exception chaining: messages may contain the input.
             raise ClassificationUnavailable(f"layer failed: {type(exc).__name__}") from None
 
-        return _merge(judged, _flags(rule_hits, moderation))
+        layers = LayerResults(rule_hits=rule_hits, moderation=moderation, judged=judged)
+        return _merge(judged, _flags(rule_hits, moderation)), layers
 
 
 def _flags(rule_hits: frozenset[Category], moderation: ModerationResult) -> set[Category]:

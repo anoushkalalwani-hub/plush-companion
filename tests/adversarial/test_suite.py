@@ -38,7 +38,9 @@ def test_fake_mode_tool_passes():
     assert run.main(["--mode", "fake"]) == 0
 
 
-def test_live_mode_is_not_available_yet():
+def test_live_mode_without_groq_settings_exits_cleanly(monkeypatch):
+    for name in ("GROQ_API_KEY", "GROQ_CHAT_MODEL", "GROQ_JUDGE_MODEL", "GROQ_MODERATION_MODEL"):
+        monkeypatch.delenv(name, raising=False)
     assert run.main(["--mode", "live"]) == 2
 
 

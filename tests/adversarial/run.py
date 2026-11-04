@@ -5,18 +5,36 @@
 fake: runs only the deterministic rules layer (no network). Reports how many block cases the
       rules catch on their own, any rules_should_catch case they miss (a failure), and harmless
       cases the rules over-block.
-live: runs the full layered classifier and policy engine against a real provider and reports
-      critical failures (a block case allowed). Needs the provider adapters from M2 PR C.
+live: runs every case through the layered classifier on Groq, evaluates the policy engine at a
+      grid of thresholds, proposes one, then runs the harmless cases through the full pipeline.
+      Writes a Markdown report to reports/adversarial/. Synthetic inputs only.
+
+    uv run --env-file .env python -m tests.adversarial.run --mode live
 
 Inputs are synthetic, so failing cases are printed in full to help labelling.
 """
 
 import argparse
+import asyncio
 import sys
 from collections import Counter
+from datetime import UTC, datetime
+from pathlib import Path
 
+from backend.llm.groq import (
+    GroqClient,
+    GroqConfig,
+    GroqConfigError,
+    GroqJudge,
+    GroqLLMProvider,
+    GroqModeration,
+)
 from backend.safety.rules import match_input_rules
+from tests.adversarial.analysis import critical_failures
 from tests.adversarial.cases import Case, ExpectedDecision, LabelStatus, load_cases
+from tests.adversarial.live import Providers, run_live
+
+REPORTS_DIR = Path(__file__).resolve().parents[2] / "reports" / "adversarial"
 
 
 def rules_report(cases: list[Case]) -> tuple[list[str], int]:
@@ -60,14 +78,52 @@ def rules_report(cases: list[Case]) -> tuple[list[str], int]:
     return lines, len(missed)
 
 
+async def _live(concurrency: int) -> int:
+    try:
+        config = GroqConfig.from_env()
+    except GroqConfigError as exc:
+        print(f"live mode needs Groq settings in the environment ({exc})", file=sys.stderr)
+        print(
+            "run with: uv run --env-file .env python -m tests.adversarial.run --mode live",
+            file=sys.stderr,
+        )
+        return 2
+
+    client = GroqClient(config)
+    providers = Providers(
+        llm=GroqLLMProvider(client, config),
+        judge=GroqJudge(client, config),
+        moderation=GroqModeration(client, config),
+        description=(
+            f"Groq: chat `{config.chat_model}` ({config.chat_reasoning_effort}), "
+            f"judge `{config.judge_model}` ({config.judge_reasoning_effort}), "
+            f"moderation `{config.moderation_model}` ({config.moderation_reasoning_effort})"
+        ),
+    )
+    try:
+        report, inputs, threshold = await run_live(load_cases(), providers, concurrency)
+    finally:
+        await client.aclose()
+
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = REPORTS_DIR / f"live-{datetime.now(UTC):%Y%m%d-%H%M}.md"
+    path.write_text(report, encoding="utf-8")
+    print(
+        f"proposed threshold {threshold:.2f}; "
+        f"critical failures at it: {len(critical_failures(inputs, threshold))}"
+    )
+    print(f"report: {path}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--mode", choices=["fake", "live"], default="fake")
+    parser.add_argument("--concurrency", type=int, default=4, help="live mode: parallel cases")
     args = parser.parse_args(argv)
 
     if args.mode == "live":
-        print("live mode needs the provider adapters from M2 PR C", file=sys.stderr)
-        return 2
+        return asyncio.run(_live(args.concurrency))
 
     lines, failures = rules_report(load_cases())
     print("\n".join(lines))

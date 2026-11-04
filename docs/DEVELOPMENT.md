@@ -35,7 +35,7 @@ Safety-critical changes (anything in `backend/safety/`, `backend/conversation/`,
 - **A (this change):** judge and moderation interfaces, three-layer input classifier (D-005), three-part output validator (D-006), deterministic rules. Not wired into the app yet: it needs provider adapters (PR C), so the app still uses the M1 stand-ins.
 - **B:** adversarial case format (`tests/adversarial/cases.csv`), 121 draft cases, test-run tool. Built on top of A.
 - **C:** Groq adapters (D-016) for reply generation, the judge and moderation, with simulated HTTP tests. The API app still refuses live mode.
-- **D:** first live test run on synthetic input, threshold proposal.
+- **D:** live mode for the test-run tool, threshold analysis, and the first live report on synthetic input.
 
 **M1 (text-only pipeline): merged.** What ships by default:
 
@@ -98,4 +98,10 @@ Run the report:
 uv run python -m tests.adversarial.run --mode fake
 ```
 
-Fake mode checks only the deterministic rules layer: which block cases it catches alone, any `rules_should_catch` case it misses (a failure), and harmless cases it over-blocks. `pytest` runs the same checks, plus a "fooled judge" test: every `rules_should_catch` case must still be blocked when moderation sees nothing and the LLM judge calls it harmless. Live mode (full classifier against a real provider) arrives with PR C.
+Fake mode checks only the deterministic rules layer: which block cases it catches alone, any `rules_should_catch` case it misses (a failure), and harmless cases it over-blocks. `pytest` runs the same checks, plus a "fooled judge" test: every `rules_should_catch` case must still be blocked when moderation sees nothing and the LLM judge calls it harmless. Live mode runs every case through the three-layer classifier on Groq, evaluates the policy engine at a grid of confidence thresholds, proposes the lowest threshold with no critical failures (never below 0.5), then sends the harmless cases through the full pipeline at that threshold. It writes a Markdown report to `reports/adversarial/`. Synthetic inputs only.
+
+```bash
+uv run --env-file .env python -m tests.adversarial.run --mode live
+```
+
+The proposed threshold is a suggestion: a human sets `min_confidence` (D-005) after reading the report, especially its near misses.
