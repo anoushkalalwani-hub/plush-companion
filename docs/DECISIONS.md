@@ -5,7 +5,7 @@ PRD §15.2: when requirements conflict or are ambiguous, document the conflict a
 **How to use this file**
 
 - Every entry has an ID, a status, and an owner.
-- Statuses: `Open` (needs an answer), `Proposed` (has a recommendation, awaiting human approval), `Accepted`, `Rejected`, `Superseded`.
+- Statuses: `Open` (needs an answer), `Proposed` (has a recommendation, awaiting human approval), `Accepted`, `Accepted, safety sign-off pending` (a **[safety]** entry the owner approved that the child-safety reviewer hasn't yet), `Rejected`, `Superseded`.
 - Agents may add entries and write recommendations. Only a named human may move an entry to `Accepted`. Safety-critical entries (marked **[safety]**) also need sign-off from the child-safety reviewer.
 - When an entry is accepted, add the date and who approved it. Don't edit the PRD to match; reference the decision ID instead.
 
@@ -19,10 +19,10 @@ Owners are `TBD` until someone is assigned.
 |---|---|---|---|---|
 | D-001 | Build order: safety gates from milestone 1 | Proposed | TBD | M1 |
 | D-002 | Children's privacy law (COPPA / GDPR-K) and parental consent | Open | TBD | Any use by a real child |
-| D-003 | Provider terms and data retention for child-directed use | Open | TBD | M2 (live providers) |
+| D-003 | Provider terms and data retention for child-directed use | Open: findings recorded, ZDR request needed | Anoushka Lalwani | Live providers with real input |
 | D-004 | Sensitive-disclosure response templates and reviewer **[safety]** | Open | TBD | M2 restricted categories |
-| D-005 | Input classification layers and precedence **[safety]** | Proposed | TBD | M2 |
-| D-006 | Meaning of "independent" output validation **[safety]** | Proposed | TBD | M2 |
+| D-005 | Input classification layers and precedence **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
+| D-006 | Meaning of "independent" output validation **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-007 | Latency vs. no streaming of unvalidated text | Proposed | TBD | M3 |
 | D-008 | Session context lifetime and purge on sensitive disclosure | Proposed | TBD | M1 |
 | D-009 | Safety event log schema | Proposed | TBD | M1 |
@@ -30,7 +30,7 @@ Owners are `TBD` until someone is assigned.
 | D-011 | Wake mechanism and mute switch implementation | Proposed | TBD | M4 |
 | D-012 | Project location (own folder and git repo) | Done | Project owner | — |
 | D-013 | Rate limiting deferred past M1 | Proposed | TBD | M5 |
-| D-014 | Classifier category set | Proposed | TBD | M2 |
+| D-014 | Classifier category set | Accepted | Anoushka Lalwani | — |
 
 ---
 
@@ -64,6 +64,43 @@ Owners are `TBD` until someone is assigned.
   2. Can zero or minimal data retention be enabled on each provider account? Is it contractually guaranteed?
   3. Where is data processed geographically?
 - **Recommendation:** Record the answer per provider in this entry before switching any provider from fake to live mode with real (non-synthetic) input.
+- **Findings: OpenAI API (researched 2026-11-04; a summary, not legal advice):**
+  - **Under-13 use: allowed with conditions.**
+    - The [Services Agreement](https://cdn.openai.com/osa/openai-services-agreement.pdf) (version "ONLINE v.010126") §3.3 forbids letting minors use the services without parent or guardian consent. It has no outright under-13 ban.
+    - The [Under-18 API guidance](https://developers.openai.com/api/docs/guides/safety-checks/under-18-api-guidance) adds these conditions:
+      - no processing of under-13 personal data without zero data retention (ZDR) in place first;
+      - compliance with child-privacy law (COPPA is named);
+      - age-appropriate safeguards: AI disclosure, content filters, monitoring with escalation;
+      - OpenAI may audit and suspend access.
+    - ChatGPT's own 13+ minimum applies to its end users, not to API customers' products.
+  - **Usage Policies are changing.** A revision on protections for children and teens takes effect **2026-11-20**, and its text was not readable at research time. **Re-check after 2026-11-20.**
+  - **Possible conflict:** older Business Terms (Aug 2023) and the App Developer Terms ban sending under-13 personal information. The current guidance allows it once ZDR is in place. Ask OpenAI to confirm which applies.
+  - **Training:** API data is not used for training by default (Services Agreement §4.2; [your-data guide](https://developers.openai.com/api/docs/guides/your-data)).
+  - **Default retention:**
+
+    | Endpoint | Default retention |
+    |---|---|
+    | Transcription | None |
+    | Moderation | None |
+    | Text-to-speech | 30 days |
+    | Chat Completions / Responses | 30 days (Responses also stores by default unless `store=false`) |
+
+  - **ZDR:**
+    - All four endpoints we use are eligible. Chat and Responses are eligible with limitations, and ZDR forces `store=false`.
+    - ZDR needs prior approval from OpenAI sales and can be set per organization or per project.
+    - CSAM-flagged images are kept even under ZDR. That is not relevant to our text and audio use.
+  - **Data residency:**
+    - Processing can happen in the US, the EU or the UAE. Transcription and text-to-speech are US or EU only.
+    - Residency is arranged through sales and needs ZDR or modified abuse monitoring approval.
+    - Models released on or after 2026-03-05 cost 10% more with residency.
+  - **DPA:** available and incorporated by reference (Services Agreement §5.3, [DPA](https://openai.com/policies/data-processing-addendum/)). OpenAI acts as processor.
+  - **Unverified:** openai.com policy pages and the Help Center blocked automated reading. Items taken from search excerpts (Usage Policies, DPA details) need a manual check in a browser.
+- **Implications for this project:**
+  1. ZDR approval is a hard prerequisite before any real child's speech reaches OpenAI, including in a supervised pilot. Fake mode and synthetic adult test input are unaffected.
+  2. With ZDR, the LLM provider adapter must send `store=false` (Responses API) and must not rely on any stored state.
+  3. Parental consent (D-002) is required by OpenAI's terms, not just by law.
+  4. If the pilot is in the EU or UK, use EU processing. Transcription and text-to-speech support it.
+- **Next steps (owner):** request ZDR and a DPA from OpenAI sales, ask them to confirm the under-13 terms conflict above, and re-read the Usage Policies after 2026-11-20.
 - **Decision:** —
 
 ## D-004 — Sensitive-disclosure response templates **[safety]**
@@ -77,7 +114,7 @@ Owners are `TBD` until someone is assigned.
 
 ## D-005 — Input classification layers and precedence **[safety]**
 
-- **Status:** Proposed
+- **Status:** Accepted, safety sign-off pending
 - **PRD refs:** §7.2, §7.3
 - **Gap:** §7.3 says the policy engine must not rely *exclusively* on LLM classification, but does not say what else it uses or how disagreements are resolved.
 - **Recommendation:** Three layers, evaluated independently:
@@ -86,15 +123,15 @@ Owners are `TBD` until someone is assigned.
   3. **LLM classifier:** structured output per §7.2, schema-validated.
 
   The policy engine takes the **most restrictive** outcome across layers. Any layer failing, timing out, or returning malformed output counts as "cannot decide" and triggers fallback. Confidence thresholds are set from adversarial-suite results, not defaults.
-- **Decision:** —
+- **Decision:** Accepted as recommended (all three layers, most restrictive wins) by Anoushka Lalwani, project owner, 2026-11-04. Child-safety reviewer sign-off still required.
 
 ## D-006 — Meaning of "independent" output validation **[safety]**
 
-- **Status:** Proposed
+- **Status:** Accepted, safety sign-off pending
 - **PRD refs:** §7.1, §7.5
 - **Recommendation:** Output validation is independent when it does not share a prompt, conversation context, or model call with generation. Validation consists of: deterministic checks (length, personal information patterns, banned phrases such as claims to be human or secrecy language), the moderation API, and a separate LLM validator call with its own prompt that sees only the candidate response and the policy category. A failed response is discarded, never repaired.
-- **Open sub-question:** Should the LLM validator use a different model or provider from the generator?
-- **Decision:** —
+- **Sub-question:** Should the LLM validator use a different model or provider from the generator?
+- **Decision:** Accepted as recommended by Anoushka Lalwani, project owner, 2026-11-04. The LLM validator uses the **same provider** as generation, via a separate call with its own prompt and no shared context. This keeps one provider to vet under D-003. A different provider can be swapped in later behind the validator interface. Child-safety reviewer sign-off still required.
 
 ## D-007 — Latency vs. no streaming
 
@@ -148,9 +185,9 @@ Owners are `TBD` until someone is assigned.
 
 ## D-014 — Classifier category set
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **PRD refs:** §6.3, §7.2
 - **Gap:** §7.2 lists classifier intents (ordinary, educational, creative, personal information, sensitive disclosure, dangerous, medical, inappropriate, ambiguous), while §6.3 lists conversation categories. They overlap but don't match one to one.
 - **M1 choice:** `Category` in `backend/safety/classifier.py` uses the §6.3 approved and restricted categories plus `unclassifiable`. §7.2's "sensitive disclosure" is carried by `requires_special_handling`, which always blocks and purges session context.
 - **Recommendation:** Confirm or revise this mapping before the M2 classifier is built, since the adversarial suite's expected outcomes depend on it.
-- **Decision:** —
+- **Decision:** M1 mapping confirmed as is by Anoushka Lalwani, project owner, 2026-11-04. The adversarial suite labels expected outcomes against these categories.
