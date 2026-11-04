@@ -2,7 +2,11 @@
 
 A stuffed animal with a Raspberry Pi, microphone, and speaker that children aged about 5–10 can talk to. Every message passes through a backend safety pipeline that is independent of the language model, and the system fails closed to predefined responses.
 
-**Status:** M0, scaffolding and documentation only. No code is implemented yet. Not for use with children (see [D-002](docs/DECISIONS.md#d-002--childrens-privacy-law-and-parental-consent)).
+**Status:** M1, text-only backend pipeline with safety stages stubbed to fail closed (every reply is the fallback until M2). Not for use with children (see [D-002](docs/DECISIONS.md#d-002--childrens-privacy-law-and-parental-consent)).
+
+```bash
+uv sync && uv run pytest
+```
 
 ## Docs
 
@@ -27,4 +31,4 @@ docs/        PRD and design docs
 
 ## Next step
 
-M1: a text-only pipeline with every safety stage stubbed to fail closed. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+M2: real classification layers, output validation, LLM provider, and the adversarial suite. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).

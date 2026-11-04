@@ -1,0 +1,41 @@
+"""Structural checks for the invariants in docs/ARCHITECTURE.md."""
+
+import ast
+import dataclasses
+from pathlib import Path
+
+from backend.audit.events import SafetyEvent
+
+BACKEND = Path(__file__).resolve().parents[2] / "backend"
+
+# Invariant 3: only the conversation manager may call LLMProvider.generate.
+GENERATE_CALLERS_ALLOWED = {BACKEND / "conversation" / "manager.py"}
+
+
+def _generate_call_sites() -> set[Path]:
+    callers = set()
+    for path in BACKEND.rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "generate"
+            ):
+                callers.add(path)
+    return callers
+
+
+def test_only_conversation_manager_calls_generate():
+    assert _generate_call_sites() <= GENERATE_CALLERS_ALLOWED
+
+
+def test_conversation_manager_does_call_generate():
+    # Guards the check above against passing vacuously after a rename.
+    assert _generate_call_sites() == GENERATE_CALLERS_ALLOWED
+
+
+def test_safety_event_has_no_content_fields():
+    # Invariant 7 / D-009: the audit event type cannot carry text.
+    fields = {f.name for f in dataclasses.fields(SafetyEvent)}
+    assert fields.isdisjoint({"text", "transcript", "response", "message", "content", "audio"})

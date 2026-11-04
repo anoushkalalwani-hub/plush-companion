@@ -21,7 +21,7 @@ Good uses here:
 - Searching for content leaking into logs, or any call to `LLMProvider.generate` outside `conversation_manager`.
 
 ### Done means
-- Tests and lint pass (commands to be added in M1).
+- `uv run pytest` and `uv run ruff check . && uv run ruff format --check .` pass.
 - `tests/safety/` passes. If safety code changed, the adversarial suite passes too.
 - Docs updated: DECISIONS entry for any choice made, SAFETY_POLICY review status unchanged unless a human reviewed it.
 
