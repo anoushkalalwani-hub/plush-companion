@@ -11,6 +11,10 @@ live: runs every case through the layered classifier on Groq, evaluates the poli
 
     uv run --env-file .env python -m tests.adversarial.run --mode live
 
+Free-tier daily limits can stop a run partway. To finish it without repeating everything, rerun
+only some cases (--cases), or only the reply side at a threshold you choose (--replies-only
+--threshold). Subset reports say so in their header.
+
 Inputs are synthetic, so failing cases are printed in full to help labelling.
 """
 
@@ -78,7 +82,29 @@ def rules_report(cases: list[Case]) -> tuple[list[str], int]:
     return lines, len(missed)
 
 
-async def _live(concurrency: int) -> int:
+def select_cases(cases: list[Case], ids: str | None) -> list[Case]:
+    """Cases named in a comma-separated id list, in suite order. Unknown ids are an error."""
+    if not ids:
+        return cases
+    wanted = {i.strip() for i in ids.split(",") if i.strip()}
+    unknown = wanted - {c.id for c in cases}
+    if unknown:
+        raise ValueError(f"unknown case ids: {', '.join(sorted(unknown))}")
+    return [c for c in cases if c.id in wanted]
+
+
+async def _live(
+    concurrency: int,
+    case_ids: str | None = None,
+    threshold: float | None = None,
+    replies_only: bool = False,
+) -> int:
+    all_cases = load_cases()
+    try:
+        cases = select_cases(all_cases, case_ids)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
     try:
         config = GroqConfig.from_env()
     except GroqConfigError as exc:
@@ -101,17 +127,25 @@ async def _live(concurrency: int) -> int:
         ),
     )
     try:
-        report, inputs, threshold = await run_live(load_cases(), providers, concurrency)
+        report, inputs, threshold = await run_live(
+            cases,
+            providers,
+            concurrency,
+            threshold=threshold,
+            replies_only=replies_only,
+            subset_of=len(all_cases) if len(cases) < len(all_cases) else None,
+        )
     finally:
         await client.aclose()
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"live-{datetime.now(UTC):%Y%m%d-%H%M}.md"
     path.write_text(report, encoding="utf-8")
-    print(
-        f"proposed threshold {threshold:.2f}; "
-        f"critical failures at it: {len(critical_failures(inputs, threshold))}"
-    )
+    if inputs:
+        print(
+            f"threshold {threshold:.2f}; "
+            f"critical failures at it: {len(critical_failures(inputs, threshold))}"
+        )
     print(f"report: {path}")
     return 0
 
@@ -120,10 +154,28 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--mode", choices=["fake", "live"], default="fake")
     parser.add_argument("--concurrency", type=int, default=4, help="live mode: parallel cases")
+    parser.add_argument("--cases", help="live mode: comma-separated case ids to run (default: all)")
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        help="live mode: confidence threshold for the reply side instead of the proposed one",
+    )
+    parser.add_argument(
+        "--replies-only",
+        action="store_true",
+        help="live mode: skip the input side; needs --threshold",
+    )
     args = parser.parse_args(argv)
 
+    if args.mode != "live" and (args.cases or args.threshold is not None or args.replies_only):
+        parser.error("--cases, --threshold and --replies-only need --mode live")
+    if args.replies_only and args.threshold is None:
+        parser.error("--replies-only needs --threshold")
+    if args.threshold is not None and not 0.0 <= args.threshold <= 1.0:
+        parser.error("--threshold must be between 0 and 1")
+
     if args.mode == "live":
-        return asyncio.run(_live(args.concurrency))
+        return asyncio.run(_live(args.concurrency, args.cases, args.threshold, args.replies_only))
 
     lines, failures = rules_report(load_cases())
     print("\n".join(lines))

@@ -57,6 +57,15 @@ class Providers:
     description: str  # Model names and settings, for the report header.
 
 
+@dataclass(frozen=True)
+class RunScope:
+    """What a run covered, for the report header."""
+
+    case_ids: tuple[str, ...] = ()
+    subset_of: int | None = None  # Suite size when only some cases were selected.
+    threshold_given: bool = False  # Reply-side threshold came from the command line.
+
+
 class _RecordingAudit(AuditLogger):
     def __init__(self) -> None:
         self.events: dict[str, SafetyEvent] = {}
@@ -214,33 +223,58 @@ def render_report(
     threshold: float,
     provider_description: str,
     started: datetime,
+    scope: RunScope | None = None,
 ) -> str:
-    labels = Counter(o.case.label_status for o in inputs)
-    allow_total = sum(1 for o in inputs if o.case.expected_decision is ExpectedDecision.ALLOW)
-    unavailable = [o for o in inputs if o.final is None]
-    retried = sum(o.attempts - 1 for o in inputs)
-    category_matches = sum(
-        1 for o in inputs if o.final is not None and o.final.category == o.case.expected_category
-    )
+    scope = scope or RunScope()
+    cases = [o.case for o in inputs] or [r.case for r in replies]
+    labels = Counter(c.label_status for c in cases)
 
     lines = [
         f"# Live adversarial run, {started:%Y-%m-%d %H:%M} UTC",
         "",
         f"- **Providers:** {provider_description}",
-        f"- **Cases:** {len(inputs)} ({labels[LabelStatus.HUMAN_CHECKED]} human_checked, "
+        f"- **Cases:** {len(cases)} ({labels[LabelStatus.HUMAN_CHECKED]} human_checked, "
         f"{labels[LabelStatus.DRAFT]} draft)",
-        f"- **Classifier unavailable after retries:** {len(unavailable)} (retries used: {retried})",
-        f"- **Final category matched the expected label:** {category_matches} / {len(inputs)}",
-        "",
     ]
-    if labels[LabelStatus.HUMAN_CHECKED] < len(inputs):
+    if scope.subset_of is not None:
+        lines.append(
+            f"- **Subset run:** {len(scope.case_ids)} of {scope.subset_of} cases selected "
+            f"({', '.join(scope.case_ids)}). Threshold numbers cover only these cases; combine "
+            "with the earlier report before choosing a threshold."
+        )
+    if scope.threshold_given:
+        lines.append(f"- **Reply-side threshold:** {threshold:.2f}, given on the command line")
+    if inputs:
+        unavailable = [o for o in inputs if o.final is None]
+        category_matches = sum(
+            1
+            for o in inputs
+            if o.final is not None and o.final.category == o.case.expected_category
+        )
+        lines += [
+            f"- **Classifier unavailable after retries:** {len(unavailable)} "
+            f"(retries used: {sum(o.attempts - 1 for o in inputs)})",
+            f"- **Final category matched the expected label:** {category_matches} / {len(inputs)}",
+        ]
+    lines.append("")
+    if labels[LabelStatus.HUMAN_CHECKED] < len(cases):
         lines += [
             "> Draft labels: these numbers are not a PRD §12.2 release-gate result until every "
             "case is human_checked.",
             "",
         ]
+    if inputs:
+        lines += _input_section(inputs, threshold, scope)
+    else:
+        lines += ["## Input side", "", "Skipped (replies-only run).", ""]
+    lines += _reply_section(replies, threshold)
+    return "\n".join(lines) + "\n"
 
-    lines += [
+
+def _input_section(inputs: list[InputOutcome], threshold: float, scope: RunScope) -> list[str]:
+    allow_total = sum(1 for o in inputs if o.case.expected_decision is ExpectedDecision.ALLOW)
+    unavailable = [o for o in inputs if o.final is None]
+    lines = [
         "## Input side: policy decisions by confidence threshold",
         "",
         "Critical failure: a harmful case that would reach generation. Near miss: a harmful case "
@@ -250,13 +284,16 @@ def render_report(
         "|---|---|---|---|",
     ]
     for t in sorted({*THRESHOLD_GRID, threshold}):
-        marker = " **(proposed)**" if t == threshold else ""
+        marker = ""
+        if t == threshold:
+            marker = " **(used)**" if scope.threshold_given else " **(proposed)**"
         lines.append(
             f"| {t:.2f}{marker} | {len(critical_failures(inputs, t))} "
             f"| {len(near_misses(inputs, t))} | {len(over_blocked(inputs, t))} / {allow_total} |"
         )
 
-    lines += ["", f"**Proposed threshold: {threshold:.2f}** (needs human approval, D-005)", ""]
+    proposal = "Threshold used for replies" if scope.threshold_given else "Proposed threshold"
+    lines += ["", f"**{proposal}: {threshold:.2f}** (needs human approval, D-005)", ""]
     lines += ["### Which layers flagged harmful cases", "", *_layer_catch_rates(inputs), ""]
 
     sections = [
@@ -269,11 +306,14 @@ def render_report(
         lines += [f"### {title} ({len(outcomes)})", ""]
         lines += _outcome_rows(outcomes) if outcomes else ["None."]
         lines.append("")
+    return lines
 
+
+def _reply_section(replies: list[ReplyOutcome], threshold: float) -> list[str]:
     sources = Counter(r.source for r in replies)
     reasons = Counter(r.reason for r in replies if r.source is not ResponseSource.GENERATED)
-    lines += [
-        "## Reply side: harmless cases through the full pipeline at the proposed threshold",
+    lines = [
+        f"## Reply side: harmless cases through the full pipeline at threshold {threshold:.2f}",
         "",
         f"- **Generated and passed validation:** {sources[ResponseSource.GENERATED]} / "
         f"{len(replies)}",
@@ -291,7 +331,7 @@ def render_report(
             f"| {r.case.id} | {_cell(r.case.input)} | {r.source} | {r.reason} "
             f"| {r.latency_ms} ms | {_cell(r.text)} |"
         )
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 async def run_live(
@@ -299,20 +339,39 @@ async def run_live(
     providers: Providers,
     concurrency: int = 4,
     backoff_seconds: float = 2.0,
+    *,
+    threshold: float | None = None,
+    replies_only: bool = False,
+    subset_of: int | None = None,
 ) -> tuple[str, list[InputOutcome], float]:
+    """Run the input side, the reply side, or both.
+
+    threshold: use this for the reply side instead of the proposed one. Required with
+    replies_only, since there are no input results to propose from.
+    subset_of: total size of the suite when `cases` is a selection, so the report says so.
+    """
+    if replies_only and threshold is None:
+        raise ValueError("a replies-only run needs a threshold")
     started = datetime.now(UTC)
-    classifier = LayeredClassifier(moderation=providers.moderation, judge=providers.judge)
-    inputs = await classify_cases(
-        cases, classifier, concurrency=concurrency, backoff_seconds=backoff_seconds
-    )
-    threshold = propose_threshold(inputs)
+    inputs: list[InputOutcome] = []
+    if not replies_only:
+        classifier = LayeredClassifier(moderation=providers.moderation, judge=providers.judge)
+        inputs = await classify_cases(
+            cases, classifier, concurrency=concurrency, backoff_seconds=backoff_seconds
+        )
+    reply_threshold = threshold if threshold is not None else propose_threshold(inputs)
     allow_cases = [c for c in cases if c.expected_decision is ExpectedDecision.ALLOW]
     replies = await reply_cases(
         allow_cases,
         providers,
-        threshold,
+        reply_threshold,
         concurrency=max(1, concurrency // 2),
         backoff_seconds=backoff_seconds,
     )
-    report = render_report(inputs, replies, threshold, providers.description, started)
-    return report, inputs, threshold
+    scope = RunScope(
+        case_ids=tuple(c.id for c in cases) if subset_of is not None else (),
+        subset_of=subset_of,
+        threshold_given=threshold is not None,
+    )
+    report = render_report(inputs, replies, reply_threshold, providers.description, started, scope)
+    return report, inputs, reply_threshold

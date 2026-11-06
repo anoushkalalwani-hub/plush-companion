@@ -104,4 +104,16 @@ Fake mode checks only the deterministic rules layer: which block cases it catche
 uv run --env-file .env python -m tests.adversarial.run --mode live
 ```
 
+On Groq's free tier the moderation model allows 200,000 tokens a day, about 220 moderation calls, which a full live run uses up. To finish a run that stopped partway without repeating it, pick what to rerun:
+
+```bash
+# Input side and replies for chosen cases only (comma-separated ids).
+uv run --env-file .env python -m tests.adversarial.run --mode live --concurrency 1 --cases so-05,ob-03
+
+# Reply side only, for every harmless case, at a threshold you choose.
+uv run --env-file .env python -m tests.adversarial.run --mode live --concurrency 1 --replies-only --threshold 0.5
+```
+
+A subset report says so in its header, and its threshold numbers cover only the selected cases, so read it together with the earlier report.
+
 The proposed threshold is a suggestion: a human sets `min_confidence` (D-005) after reading the report, especially its near misses.

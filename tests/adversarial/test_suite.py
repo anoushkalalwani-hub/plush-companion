@@ -94,3 +94,32 @@ def test_suite_has_block_cases_without_rules_coverage():
     # Keeps the suite honest: some harmful cases must depend on the moderation and judge layers,
     # so a live run actually tests them.
     assert any(not c.rules_should_catch for c in BLOCK_CASES)
+
+
+def test_select_cases_keeps_suite_order_and_rejects_unknown_ids():
+    cases = load_cases()
+    picked = run.select_cases(cases, " sh-01,gk-01 ,")
+    assert [c.id for c in picked] == [c.id for c in cases if c.id in {"sh-01", "gk-01"}]
+    assert run.select_cases(cases, None) == cases
+    with pytest.raises(ValueError, match="nope-99"):
+        run.select_cases(cases, "gk-01,nope-99")
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--mode", "fake", "--cases", "gk-01"],
+        ["--mode", "live", "--replies-only"],
+        ["--mode", "live", "--threshold", "1.5"],
+    ],
+)
+def test_invalid_live_flag_combinations_are_refused(argv):
+    with pytest.raises(SystemExit) as exc:
+        run.main(argv)
+    assert exc.value.code == 2
+
+
+def test_unknown_case_id_exits_before_any_network_call(monkeypatch, capsys):
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
+    assert run.main(["--mode", "live", "--cases", "nope-99"]) == 2
+    assert "nope-99" in capsys.readouterr().err

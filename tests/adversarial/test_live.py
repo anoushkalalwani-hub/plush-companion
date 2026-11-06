@@ -1,13 +1,16 @@
 """Live run plumbing, exercised with scripted providers instead of the network."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+
+import pytest
 
 from backend.conversation.manager import ResponseSource
 from backend.llm.base import GenerationResult
 from backend.safety.classifier import ClassificationUnavailable
 from backend.safety.judge_prompts import CLASSIFIER_INSTRUCTIONS
 from backend.safety.layered_classifier import LayeredClassifier
+from tests.adversarial.analysis import InputOutcome
 from tests.adversarial.cases import ExpectedDecision, load_cases
 from tests.adversarial.live import (
     Providers,
@@ -105,9 +108,11 @@ async def test_persistent_unavailability_is_recorded_not_raised():
 
 
 def test_report_escapes_table_cells():
-    outcomes = []
-    report = render_report(outcomes, [], 0.5, "scripted | pipe", datetime.now(UTC))
+    case = replace(SAMPLE[0], input="a | b\nc")
+    outcomes = [InputOutcome(case=case, final=None, layers=None, attempts=1)]
+    report = render_report(outcomes, [], 0.5, "scripted", datetime.now(UTC))
     assert "Proposed threshold: 0.50" in report
+    assert "| a \\| b c |" in report
 
 
 async def test_reply_side_retries_provider_errors_in_a_fresh_session():
@@ -146,3 +151,36 @@ async def test_reply_side_does_not_retry_validation_failures():
     assert reply.source is ResponseSource.FALLBACK
     assert reply.attempts == 1
     assert "judge_rejected:persona" in reply.reason
+
+
+async def test_replies_only_run_skips_classification_and_uses_given_threshold():
+    judge = RoutingJudge()
+    report, inputs, threshold = await run_live(
+        SAMPLE, _providers(judge), threshold=0.7, replies_only=True
+    )
+    allow = [c for c in SAMPLE if c.expected_decision is ExpectedDecision.ALLOW]
+    assert inputs == [] and threshold == 0.7
+    assert "Skipped (replies-only run)." in report
+    assert "Reply-side threshold:** 0.70, given on the command line" in report
+    assert f"**Generated and passed validation:** {len(allow)} / {len(allow)}" in report
+    # Per allow case: classify (1 judge call) + validate (1 judge call); nothing for block cases.
+    assert judge.calls == 2 * len(allow)
+
+
+async def test_replies_only_run_needs_a_threshold():
+    with pytest.raises(ValueError):
+        await run_live(SAMPLE, _providers(), replies_only=True)
+
+
+async def test_given_threshold_overrides_the_proposal():
+    report, inputs, threshold = await run_live(SAMPLE, _providers(), threshold=0.5)
+    assert len(inputs) == len(SAMPLE)
+    assert threshold == 0.5
+    assert "**Threshold used for replies: 0.50**" in report
+    assert "0.50 **(used)**" in report
+
+
+async def test_subset_run_is_labelled_in_the_report():
+    report, _, _ = await run_live(SAMPLE[:2], _providers(), subset_of=len(CASES))
+    ids = ", ".join(c.id for c in SAMPLE[:2])
+    assert f"**Subset run:** 2 of {len(CASES)} cases selected ({ids})" in report
