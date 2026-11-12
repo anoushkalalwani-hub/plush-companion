@@ -18,7 +18,12 @@ from backend.safety.classifier import (
     RiskLevel,
 )
 from backend.safety.concurrency import run_both
-from backend.safety.judge_prompts import CLASSIFICATION_SCHEMA, CLASSIFIER_INSTRUCTIONS
+from backend.safety.judge_prompts import (
+    CHILD_MESSAGE_TAG,
+    CLASSIFICATION_SCHEMA,
+    CLASSIFIER_INSTRUCTIONS,
+    delimit,
+)
 from backend.safety.moderation import ModerationProvider, ModerationResult
 from backend.safety.rules import match_input_rules
 
@@ -46,7 +51,11 @@ class LayeredClassifier:
         try:
             moderation, raw = await run_both(
                 self._moderation.moderate(text),
-                self._judge.judge(CLASSIFIER_INSTRUCTIONS, text, CLASSIFICATION_SCHEMA),
+                self._judge.judge(
+                    CLASSIFIER_INSTRUCTIONS,
+                    delimit(CHILD_MESSAGE_TAG, text),
+                    CLASSIFICATION_SCHEMA,
+                ),
             )
             if not isinstance(moderation, ModerationResult):
                 raise TypeError("malformed moderation result")
