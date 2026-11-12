@@ -45,7 +45,7 @@ Each needs a defined decision, template, and tests. Decisions below are **TBD â€
 
 **Special handling (D-015):** abuse or unsafe situations, bullying and mistreatment, self-harm, and personal information always set `requires_special_handling`, which blocks the message and wipes session context, whichever classifier layer flagged them.
 
-**How the layers combine (D-005):** keyword and pattern rules, moderation, and the LLM judge each label the input. Any restricted flag from rules or moderation overrides an approved judge label and forces high risk; if several categories are flagged, the most severe (order in `SEVERITY_ORDER`, `backend/safety/classifier.py`) is logged. The rule lists can only make the result stricter.
+**How the layers combine (D-005):** keyword and pattern rules, moderation, and the LLM judge each label the input. Any restricted flag from rules or moderation overrides an approved judge label and forces high risk; if several categories are flagged, the most severe (order in `SEVERITY_ORDER`, `backend/safety/classifier.py`) is logged. The rule lists can only make the result stricter. Prompt-injection phrases (D-017) are a rule list under `unclassifiable`, so a match blocks as "cannot decide". The judge sees the child's words inside `<child_message>` delimiters, with angle brackets in the input neutralised.
 
 | Category | Decision | Template ID | Session purge | Tests |
 |---|---|---|---|---|

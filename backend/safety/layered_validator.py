@@ -9,7 +9,13 @@ into a fallback.
 from backend.llm.base import JudgeModel
 from backend.safety.classifier import Category
 from backend.safety.concurrency import run_both
-from backend.safety.judge_prompts import VALIDATION_SCHEMA, VALIDATOR_INSTRUCTIONS, ValidatorVerdict
+from backend.safety.judge_prompts import (
+    CANDIDATE_REPLY_TAG,
+    VALIDATION_SCHEMA,
+    VALIDATOR_INSTRUCTIONS,
+    ValidatorVerdict,
+    delimit,
+)
 from backend.safety.moderation import ModerationProvider, ModerationResult
 from backend.safety.output_rules import check_output
 from backend.safety.validator import ValidationResult
@@ -24,7 +30,7 @@ class LayeredValidator:
         if reason := check_output(text):
             return ValidationResult(passed=False, reason=reason)
 
-        content = f"Conversation category: {category.value}\n\nCandidate reply:\n{text}"
+        content = f"Conversation category: {category.value}\n\n{delimit(CANDIDATE_REPLY_TAG, text)}"
         moderation, raw = await run_both(
             self._moderation.moderate(text),
             self._judge.judge(VALIDATOR_INSTRUCTIONS, content, VALIDATION_SCHEMA),
