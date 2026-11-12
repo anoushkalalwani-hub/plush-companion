@@ -11,8 +11,14 @@ BACKEND = Path(__file__).resolve().parents[2] / "backend"
 # Invariant 3: only the conversation manager may call LLMProvider.generate.
 GENERATE_CALLERS_ALLOWED = {BACKEND / "conversation" / "manager.py"}
 
+# Judge output is parsed into labels and never spoken, so only the two layered checks may call it.
+JUDGE_CALLERS_ALLOWED = {
+    BACKEND / "safety" / "layered_classifier.py",
+    BACKEND / "safety" / "layered_validator.py",
+}
 
-def _generate_call_sites() -> set[Path]:
+
+def _call_sites(method: str) -> set[Path]:
     callers = set()
     for path in BACKEND.rglob("*.py"):
         tree = ast.parse(path.read_text(), filename=str(path))
@@ -20,19 +26,19 @@ def _generate_call_sites() -> set[Path]:
             if (
                 isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "generate"
+                and node.func.attr == method
             ):
                 callers.add(path)
     return callers
 
 
 def test_only_conversation_manager_calls_generate():
-    assert _generate_call_sites() <= GENERATE_CALLERS_ALLOWED
+    # Equality, not subset: also guards against passing vacuously after a rename.
+    assert _call_sites("generate") == GENERATE_CALLERS_ALLOWED
 
 
-def test_conversation_manager_does_call_generate():
-    # Guards the check above against passing vacuously after a rename.
-    assert _generate_call_sites() == GENERATE_CALLERS_ALLOWED
+def test_only_layered_checks_call_judge():
+    assert _call_sites("judge") == JUDGE_CALLERS_ALLOWED
 
 
 def test_safety_event_has_no_content_fields():

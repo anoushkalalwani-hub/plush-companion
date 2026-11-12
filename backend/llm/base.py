@@ -41,3 +41,13 @@ class LLMProvider(Protocol):
     async def generate(
         self, messages: Sequence[Message], constraints: GenerationConstraints
     ) -> GenerationResult: ...
+
+
+class JudgeModel(Protocol):
+    """Labelling calls for the input classifier and output validator (D-005, D-006).
+
+    One-shot: no conversation history. The returned object is parsed into fixed labels by the
+    caller and is never spoken.
+    """
+
+    async def judge(self, instructions: str, content: str, schema: dict) -> dict: ...

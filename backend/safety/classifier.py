@@ -1,7 +1,6 @@
-"""Input safety classification (PRD §7.2).
+"""Input safety classification (PRD §7.2): shared types and the M1 stub.
 
-M1 ships only the interface and a stub that is always unavailable. The real classifier, built
-from the layers proposed in D-005, arrives in M2.
+The real classifier is LayeredClassifier in layered_classifier.py (D-005).
 """
 
 from enum import StrEnum
@@ -47,6 +46,34 @@ APPROVED_CATEGORIES = frozenset(
         Category.EMOTIONAL_SUPPORT,
         Category.SOCIAL_SITUATIONS,
     }
+)
+
+
+# Sensitive disclosures (PRD §7.4 examples): always special handling, which blocks and purges
+# session context (D-015).
+SPECIAL_HANDLING_CATEGORIES = frozenset(
+    {
+        Category.ABUSE_OR_UNSAFE,
+        Category.BULLYING_AND_MISTREATMENT,
+        Category.SELF_HARM,
+        Category.PERSONAL_INFORMATION,
+    }
+)
+
+# Which restricted label wins when layers flag several. Every one of these blocks; the order only
+# decides the logged category and, once D-004 templates exist, which template is used.
+SEVERITY_ORDER = (
+    Category.SELF_HARM,
+    Category.ABUSE_OR_UNSAFE,
+    Category.SEXUAL_CONTENT,
+    Category.PERSONAL_INFORMATION,
+    Category.BULLYING_AND_MISTREATMENT,
+    Category.DANGEROUS_ACTIVITIES,
+    Category.ILLEGAL_ACTIVITY,
+    Category.MEDICAL,
+    Category.SECRECY_REQUEST,
+    Category.FAMILY_CONFLICT,
+    Category.UNCLASSIFIABLE,
 )
 
 
