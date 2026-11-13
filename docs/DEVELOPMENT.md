@@ -31,6 +31,8 @@ Safety-critical changes (anything in `backend/safety/`, `backend/conversation/`,
 
 ## Milestone status
 
+**M3 (started early, D-022).** A laptop voice simulator: speak a question in the terminal, Groq Whisper transcribes it, the full safety pipeline answers, and macOS `say` speaks the reply. For adult developer testing only (D-003). The device-to-backend audio path and backend text-to-speech are still to do.
+
 **M2 (in progress).** M2 ships as five PRs:
 - **A (this change):** judge and moderation interfaces, three-layer input classifier (D-005), three-part output validator (D-006), deterministic rules. Not wired into the app yet: it needs provider adapters (PR C), so the app still uses the M1 stand-ins.
 - **B:** adversarial case format (`tests/adversarial/cases.csv`), 121 draft cases, test-run tool. Built on top of A.
@@ -75,6 +77,14 @@ DEV_DEVICE_TOKEN=dev uv run uvicorn backend.main:create_app --factory --reload
 ```
 
 `docker compose up` starts PostgreSQL, which is not used until M5.
+
+Talk to the companion in your terminal (macOS; adult developer testing only, D-003). It needs the Groq settings in `.env`, including `GROQ_STT_MODEL`, and microphone access for your terminal app:
+
+```bash
+uv run --group voice --env-file .env python -m device.simulator
+```
+
+Press Enter to start talking and Enter again to stop. Add `--type` to type instead of speaking, `--voice NAME` to pick a macOS voice (`say -v '?'` lists them), or `--threshold` to change the confidence threshold (default 0.50, an evaluation value, D-005). Each turn uses about two moderation calls, so the Groq free tier allows roughly 100 turns a day.
 
 All providers default to fake implementations. Live providers are enabled per provider through environment variables, and only after D-003 is answered for that provider.
 

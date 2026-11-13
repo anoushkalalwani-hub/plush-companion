@@ -2,10 +2,16 @@
 
 A stuffed animal with a Raspberry Pi, microphone, and speaker that children aged about 5–10 can talk to. Every message passes through a backend safety pipeline that is independent of the language model, and the system fails closed to predefined responses.
 
-**Status:** M1, text-only backend pipeline with safety stages stubbed to fail closed (every reply is the fallback until M2). Not for use with children (see [D-002](docs/DECISIONS.md#d-002--childrens-privacy-law-and-parental-consent)).
+**Status:** M2 safety layers and Groq adapters are merged; the API app still runs in fake mode. A laptop voice simulator (M3, started early) runs the real pipeline on Groq for adult developer testing. Not for use with children (see [D-002](docs/DECISIONS.md#d-002--childrens-privacy-law-and-parental-consent)).
 
 ```bash
 uv sync && uv run pytest
+```
+
+Talk to it in your terminal (macOS, adult developer testing only; see [D-022](docs/DECISIONS.md#d-022--laptop-voice-simulator-for-adult-developer-testing)):
+
+```bash
+uv run --group voice --env-file .env python -m device.simulator
 ```
 
 ## Docs

@@ -62,7 +62,7 @@ Each module gets a documented interface and its own tests (PRD §5.2). Provider-
 | `conversation_manager` | `backend/conversation/manager.py` | `async handle_message(session, text) -> Reply` | Implemented (M1) |
 | `session_manager` | `backend/sessions/store.py` | In-memory session context with TTL (D-008) | Implemented (M1) |
 | `audit_logger` | `backend/audit/events.py` | `record(SafetyEvent)`, metadata only (D-009) | Implemented (M1) |
-| `speech_service` / `tts_service` | `backend/speech/` | `transcribe(audio) -> text`, `synthesize(text) -> audio` | M3 |
+| `speech_service` / `tts_service` | `backend/speech/` | `async SpeechToText.transcribe(wav) -> str`, `async Speaker.speak(text)`; backend `synthesize(text) -> audio` still M3 | Groq Whisper and macOS `say` adapters for the laptop simulator (D-022) |
 | `device_manager` / `authentication` | `backend/devices/`, `backend/auth/` | Device registration, credential checks, revocation | M5 (dev token stub in `backend/api/routes.py`) |
 | `memory_manager` | `backend/memory/` | Disabled for MVP (PRD §8.1) | — |
 
