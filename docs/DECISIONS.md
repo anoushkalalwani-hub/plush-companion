@@ -34,7 +34,7 @@ Owners are `TBD` until someone is assigned.
 | D-015 | Special-handling categories **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-016 | AI provider: Groq instead of OpenAI | Accepted | Anoushka Lalwani | — |
 | D-017 | Prompt injection that passes every classifier layer **[safety]** | Proposed: implemented, live rerun pending | Anoushka Lalwani | M2 exit |
-| D-018 | Emoji and formatting in spoken replies **[safety]** | Open | TBD | M3 |
+| D-018 | Emoji and formatting in spoken replies **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | M3 |
 | D-019 | Classifier timeout too short for the live judge | Open | TBD | M2 exit |
 | D-020 | Reply length limit vs. stories, songs and lists | Open | TBD | Pilot |
 | D-021 | Harmless inputs over-blocked by moderation and rules **[safety]** | Open | TBD | Pilot |
@@ -268,7 +268,7 @@ Owners are `TBD` until someone is assigned.
 
 ## D-018 — Emoji and formatting in spoken replies **[safety]**
 
-- **Status:** Open
+- **Status:** Proposed: implemented, wording awaiting approval
 - **PRD refs:** §6.2, §7.5, §13
 - **Finding:** 9 of the 18 replies that passed validation in the live run (`live-20261106-2231.md`) contain emoji (🌊 🍕 🌟 🐘 🌙 🎵), and one contains Markdown italics. Nothing in output validation rejects them. Text-to-speech would read them aloud or mispronounce them.
 - **Options:**
@@ -276,7 +276,11 @@ Owners are `TBD` until someone is assigned.
   2. Strip emoji and Markdown after validation. That edits validated text, so it would need its own rule that stripping can only remove characters and the result is validated again.
   3. Tell the system prompt not to use them, and keep option 1 as the enforcement. A prompt alone is not a safety boundary (AGENTS.md).
 - **Recommendation:** Options 1 and 3 together. Option 2 risks becoming "repair" of a failed response.
-- **Decision:** —
+- **Implemented (agent-drafted, unreviewed):** the project owner agreed to options 1 and 3 on 2026-11-13, after emoji were read aloud by the laptop simulator (D-022).
+  - Output rule `not_speakable` in `backend/safety/output_rules.py`: rejects Unicode symbol characters (categories `So` and `Sk`, which cover emoji, pictographs and skin-tone modifiers) and the Markdown marks `*`, `` ` `` and `#`. Maths signs (`+`, `=`) and ordinary punctuation stay allowed.
+  - System prompt line: "Your reply is spoken aloud. Use plain words only: no emoji, symbols, or formatting such as asterisks or lists."
+  - A reply that still has emoji falls back; the prompt line should make that rare. Not yet measured on the adversarial suite.
+- **Decision:** Options 1 and 3 chosen by Anoushka Lalwani, project owner, 2026-11-13. Rule and prompt wording still need her approval.
 
 ## D-019 — Classifier timeout too short for the live judge
 

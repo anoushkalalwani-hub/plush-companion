@@ -86,7 +86,7 @@ The device also needs its own offline fallback, stored on the device, for when t
 
 ## Output validation checks (PRD §7.5)
 
-Implemented in three parts (D-006), all of which must pass: deterministic rules (length, sentence count, personal information patterns, banned phrases), moderation of the reply, and an LLM judge that sees only the reply and its category and reports each check below.
+Implemented in three parts (D-006), all of which must pass: deterministic rules (length, sentence count, no emoji or formatting since replies are spoken (D-018), personal information patterns, banned phrases), moderation of the reply, and an LLM judge that sees only the reply and its category and reports each check below.
 
 - Age appropriateness.
 - Restricted content.

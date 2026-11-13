@@ -134,3 +134,38 @@ async def test_judge_failure_propagates_so_the_pipeline_falls_back(judge):
 async def test_moderation_failure_propagates(moderation):
     with pytest.raises(Exception):  # noqa: B017
         await _validator(moderation=moderation).validate(GOOD_REPLY, Category.EDUCATION)
+
+
+# D-018: replies are spoken, so emoji and Markdown formatting are rejected.
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Bees love flowers! 🌼",
+        "That sounds yummy! 🍕 What topping?",
+        "Cats purr when happy. 🐱💛",
+        "A star ★ is shining.",
+        "Thumbs up 👍🏽!",
+        "*Sock-sock-twirl*, put on your feet!",
+        "**Wow**, that is big!",
+        "`code` is fun.",
+        "# Fun fact",
+    ],
+)
+def test_emoji_and_formatting_are_rejected(text):
+    assert check_output(text) == "not_speakable"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        GOOD_REPLY,
+        "Seven times eight is 56!",
+        "That’s fun — let’s go outside!",
+        "Elephant is spelled E‑L‑E‑P‑H‑A‑N‑T.",
+        "Two plus three equals five, and 5 + 3 = 8.",
+        "The moon is about 384,000 kilometres away.",
+        "Some turtles live 50 years or more (wow)!",
+    ],
+)
+def test_ordinary_punctuation_is_speakable(text):
+    assert check_output(text) is None

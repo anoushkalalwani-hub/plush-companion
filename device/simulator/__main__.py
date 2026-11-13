@@ -33,6 +33,7 @@ from backend.safety.policy_engine import PolicyConfig
 from backend.sessions.store import SessionStore
 from backend.speech.groq_whisper import GroqSpeechConfig, GroqWhisper
 from backend.speech.macos_say import MacSaySpeaker
+from device.audio.cues import play_thinking_cue
 from device.audio.microphone import pcm_to_wav, record_until_enter
 from device.simulator.chat import Turn, text_turn, voice_turn
 
@@ -110,6 +111,8 @@ async def _chat(args: argparse.Namespace) -> int:
                 text = (await asyncio.to_thread(input, "> ")).strip()
                 if not text:
                     break
+                if args.chime:
+                    await play_thinking_cue()
                 turn = await text_turn(text, manager, session, speaker)
             else:
                 command = (await asyncio.to_thread(input, "[Enter] to talk > ")).strip()
@@ -117,6 +120,8 @@ async def _chat(args: argparse.Namespace) -> int:
                     break
                 print("  Listening... press Enter when you're done.")
                 pcm = await asyncio.to_thread(record_until_enter)
+                if args.chime:
+                    await play_thinking_cue()
                 turn = await voice_turn(pcm_to_wav(pcm), stt, manager, session, speaker)
             _show(turn)
     except (KeyboardInterrupt, EOFError):
@@ -134,6 +139,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--type", action="store_true", help="type questions instead of speaking")
     parser.add_argument("--voice", help="macOS voice name (see: say -v '?')")
     parser.add_argument("--rate", type=int, help="speaking rate in words per minute")
+    parser.add_argument(
+        "--no-chime",
+        dest="chime",
+        action="store_false",
+        help="don't play a sound while the toy is thinking",
+    )
     parser.add_argument(
         "--threshold",
         type=float,

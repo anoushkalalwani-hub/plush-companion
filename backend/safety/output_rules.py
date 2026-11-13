@@ -5,6 +5,7 @@ reject replies, never approve them, but they need human review before a pilot.
 """
 
 import re
+import unicodedata
 
 from backend.safety.rules import contains_personal_information, contains_phrase, normalize
 
@@ -41,6 +42,19 @@ BANNED_PHRASES = (
 )
 
 
+# D-018: replies are spoken aloud, so emoji and Markdown formatting are not allowed. Emoji and
+# pictographs are Unicode symbol characters ("So"), skin-tone modifiers are "Sk". Maths signs
+# such as + and = are "Sm" and stay allowed.
+_UNSPEAKABLE_CATEGORIES = {"So", "Sk"}
+_FORMATTING_MARKS = ("*", "`", "#")
+
+
+def _is_speakable(text: str) -> bool:
+    if any(mark in text for mark in _FORMATTING_MARKS):
+        return False
+    return not any(unicodedata.category(ch) in _UNSPEAKABLE_CATEGORIES for ch in text)
+
+
 def _sentence_count(text: str) -> int:
     return len([part for part in re.split(r"[.!?]+", text) if part.strip()])
 
@@ -51,6 +65,8 @@ def check_output(text: str) -> str | None:
         return "too_long"
     if _sentence_count(text) > MAX_SENTENCES:
         return "too_many_sentences"
+    if not _is_speakable(text):
+        return "not_speakable"
     if contains_personal_information(text):
         return "personal_information"
     normalized = normalize(text)
