@@ -19,7 +19,7 @@ Owners are `TBD` until someone is assigned.
 |---|---|---|---|---|
 | D-001 | Build order: safety gates from milestone 1 | Proposed | TBD | M1 |
 | D-002 | Children's privacy law (COPPA / GDPR-K) and parental consent | Open | TBD | Any use by a real child |
-| D-003 | Provider terms and data retention for child-directed use | Open: Groq approved for adult developer testing only; child use needs ZDR and D-002 | Anoushka Lalwani | Live providers with real input |
+| D-003 | Provider terms and data retention for child-directed use | Open: Groq and Cartesia approved for adult developer testing only; child use needs ZDR and D-002 | Anoushka Lalwani | Live providers with real input |
 | D-004 | Sensitive-disclosure response templates and reviewer **[safety]** | Open | TBD | M2 restricted categories |
 | D-005 | Input classification layers and precedence **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-006 | Meaning of "independent" output validation **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
@@ -40,6 +40,7 @@ Owners are `TBD` until someone is assigned.
 | D-021 | Harmless inputs over-blocked by moderation and rules **[safety]** | Open | TBD | Pilot |
 | D-022 | Laptop voice simulator for adult developer testing | Proposed | Anoushka Lalwani | M3 |
 | D-023 | Winston Wags persona and Groq voice **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | Pilot |
+| D-024 | Cartesia for Winston's voice instead of Groq | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
 
 ---
 
@@ -135,6 +136,22 @@ Owners are `TBD` until someone is assigned.
   1. Confirm the account holder is 18 or older.
   2. Turn on ZDR for the organization before any real child's speech is sent.
   3. Re-check the model list before the pilot, because preview models can be withdrawn.
+- **Findings: Cartesia (researched 2026-11-13; a summary, not legal advice; only reply text, never a child's audio, would be sent):**
+  - **Children:**
+    - [Terms](https://cartesia.ai/terms) (revised 2024-06-14) §1 requires account holders to be 18 or older and in the US.
+    - The [Privacy Policy](https://cartesia.ai/privacy) §8 says the services "are not intended for children". There is no child-directed program, and COPPA is not mentioned.
+    - The [AUP](https://cartesia.ai/legal/acceptable-use) (revised 2025-07-23) §2 bars output that "relates to, or appears ... to relate to or represent" anyone under 18, in Cartesia's sole discretion. Winston's voice should not sound like a child.
+  - **Training: on by default.**
+    - Terms §5.3(c): inputs and outputs "may be used by Cartesia to train" its models.
+    - Opting out uses the form at https://play.cartesia.ai/privacy/data-controls, and applies only from then on.
+  - **Retention:**
+    - No default period is stated, and Terms §5.3 allows manual review of inputs and outputs.
+    - The [DPA](https://cartesia.ai/legal) §13 offers a Zero Data Retention setting that stops storage and training. It doesn't say which plans can turn it on.
+  - **Location:** not stated. Transfers rely on the EU–US Data Privacy Framework and SCCs, and subprocessors are listed on Cartesia's Vanta trust page.
+  - **Commercial use:** depends on the subscription tier (Terms §4.1).
+  - **Unverified:** the Terms page was cut off from §8.3 onwards. Rate limits and error docs need a login.
+- **Cartesia next steps (owner):** opt out of training (or enable ZDR) before sending any text; confirm the account holder is 18 or older; check the subscription tier allows this use; have a lawyer review before any child uses it.
+- **Decision (Cartesia, partial):** Cartesia text-to-speech approved for **adult developer testing only** by Anoushka Lalwani, project owner, 2026-11-13 ("yeah add cartesia"), on the same terms as Groq. Not approved for any child's use.
 - **Decision (Groq, partial):** Groq approved for **adult developer testing only** (the developer's own voice and questions, through the laptop voice simulator, D-022) by Anoushka Lalwani, project owner, 2026-11-13. Not approved for any child's speech or data. ZDR (Groq next step 2) and the D-002 consent questions must be answered before any child uses it.
 
 ## D-004 — Sensitive-disclosure response templates **[safety]**
@@ -340,6 +357,7 @@ Owners are `TBD` until someone is assigned.
   - **Greeting:** template `WINSTON_GREETING` in `backend/safety/templates.py`, spoken once when the simulator starts. It passes the deterministic output rules.
   - **Voice:** Groq Orpheus (`canopylabs/orpheus-v1-english`, preview), voice `troy` by default, with one fixed vocal direction, `[warm]`, chosen in code. Replies are split at sentence boundaries to fit the 200-character limit without changing words. If the Groq voice fails, the macOS voice says the same text.
   - **Brackets banned in replies:** output validation now rejects `[` and `]`, so generated text cannot carry its own voice directions.
+  - **Voice replaced by Cartesia (D-024)** after Groq's Orpheus terms could not be accepted; Orpheus stays available with `--speaker groq`.
 - **Risks to check in the next adversarial run:**
   1. The validator judge's persona and category checks may reject replies that drift into holiday talk or describe Winston like a real dog, causing more fallbacks.
   2. "Holidays generally" still needs a reviewer's eye for inclusiveness; the prompt avoids naming specific holidays.
@@ -347,3 +365,17 @@ Owners are `TBD` until someone is assigned.
   4. Barking is spoken as words ("Woof!"); Orpheus documents no animal sounds.
 - **First live check, 2026-11-13:** with "1 to 4 sentences", barks, his name and festive cheer pushed replies over the 4-sentence limit, so they fell back (`validation:rejected:too_many_sentences`). The prompt now asks for 2 or 3 sentences, with a bark counting as one, and at most one extra (bark, name or cheer) per reply. After that, 2 of 3 test questions were answered; a riddle still ran too long. The festive cheer can feel forced ("Do you like the sky when you make a birthday cake?") and one bee fact was muddled.
 - **Decision:** Persona and voice requested by Anoushka Lalwani, project owner, 2026-11-13. Prompt, greeting and rule wording still need her approval, and a child-safety reviewer's.
+
+## D-024 — Cartesia for Winston's voice instead of Groq
+
+- **Status:** Proposed: the owner chose it; she marks it Accepted
+- **PRD refs:** §5.1, §5.2
+- **Conflict:** D-016 put every capability on Groq. Groq's Orpheus voice needed terms that the owner's organization could not get accepted, and the owner chose a Cartesia voice (ID `c45bc5ec-dc68-4feb-8829-6e6b2748095d`).
+- **Choice:**
+  - Cartesia `sonic-3.6` through the `/tts/bytes` endpoint is the default voice for the laptop simulator.
+  - Groq Orpheus and the macOS voice remain options. The macOS voice is the backup if Cartesia fails.
+  - Speech-to-text, the AI judge, moderation and reply generation stay on Groq.
+- **Safeguards:**
+  - Only validated reply text or the greeting template is sent to Cartesia.
+  - Output validation rejects `<` and `>` as well as brackets, so generated text can't carry Cartesia's SSML-like tags (`<emotion>`, `<speed>`, `<break>`).
+- **Decision:** Chosen by Anoushka Lalwani, project owner, 2026-11-13, for adult developer testing (D-003). Child use needs the D-003 Cartesia next steps and D-002.

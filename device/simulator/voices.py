@@ -15,5 +15,5 @@ class FallbackSpeaker:
             await self._main.speak(text)
         except SpeechError as exc:
             # Status codes and class names only, never the text.
-            print(f"  (Groq voice unavailable: {exc}; using the macOS voice)")
+            print(f"  (voice unavailable: {exc}; using the macOS voice)")
             await self._backup.speak(text)

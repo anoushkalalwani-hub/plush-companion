@@ -33,6 +33,7 @@ from backend.safety.layered_validator import LayeredValidator
 from backend.safety.policy_engine import PolicyConfig
 from backend.safety.templates import WINSTON_GREETING
 from backend.sessions.store import SessionStore
+from backend.speech.cartesia import CartesiaConfig, CartesiaSpeaker, CartesiaTTS
 from backend.speech.groq_orpheus import GroqOrpheus, GroqVoiceConfig, GroqVoiceSpeaker
 from backend.speech.groq_whisper import GroqSpeechConfig, GroqWhisper
 from backend.speech.macos_say import MacSaySpeaker
@@ -72,6 +73,7 @@ async def _chat(args: argparse.Namespace) -> int:
         groq = GroqConfig.from_env()
         speech = None if args.type else GroqSpeechConfig.from_env()
         voice = GroqVoiceConfig.from_env() if args.speaker == "groq" else None
+        cartesia = CartesiaConfig.from_env() if args.speaker == "cartesia" else None
     except (GroqConfigError, ValueError) as exc:
         print(f"Missing Groq settings in .env ({exc}).", file=sys.stderr)
         print(
@@ -79,7 +81,7 @@ async def _chat(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    needs_audio = not args.type or args.speaker == "groq"
+    needs_audio = not args.type or args.speaker != "mac"
     if needs_audio and importlib.util.find_spec("sounddevice") is None:
         print(
             "The microphone and Groq voice need the voice packages: add --group voice, or use "
@@ -105,9 +107,14 @@ async def _chat(args: argparse.Namespace) -> int:
         settings=settings,
         policy_config=PolicyConfig(min_confidence=args.threshold),
     )
-    mac_voice = MacSaySpeaker(voice=None if voice else args.voice, rate=args.rate)
-    tts = None
-    if voice:
+    mac_voice = MacSaySpeaker(voice=args.voice if args.speaker == "mac" else None, rate=args.rate)
+    tts: GroqOrpheus | CartesiaTTS | None = None
+    if cartesia:
+        if args.voice:
+            cartesia = replace(cartesia, voice_id=args.voice)
+        tts = CartesiaTTS(cartesia)
+        speaker = FallbackSpeaker(CartesiaSpeaker(tts, player=play_wav), mac_voice)
+    elif voice:
         if args.voice:
             voice = replace(voice, voice=args.voice)
         tts = GroqOrpheus(voice)
@@ -160,14 +167,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--type", action="store_true", help="type questions instead of speaking")
     parser.add_argument(
         "--speaker",
-        choices=["groq", "mac"],
-        default="groq",
-        help="groq: natural Groq voice, falling back to macOS if it fails (default); "
-        "mac: the macOS voice only",
+        choices=["cartesia", "groq", "mac"],
+        default="cartesia",
+        help="cartesia: Winston's Cartesia voice (default); groq: Groq Orpheus; mac: the macOS "
+        "voice only. Cartesia and Groq fall back to the macOS voice if they fail.",
     )
     parser.add_argument(
         "--voice",
-        help="Groq voice (autumn, diana, hannah, austin, daniel, troy) or, with --speaker mac, "
+        help="override the voice: a Cartesia voice ID, a Groq voice (autumn, diana, hannah, "
+        "austin, daniel, troy), or, with --speaker mac, "
         "a macOS voice name (see: say -v '?')",
     )
     parser.add_argument("--rate", type=int, help="macOS voice speaking rate in words per minute")

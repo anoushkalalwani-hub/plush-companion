@@ -46,9 +46,9 @@ BANNED_PHRASES = (
 # pictographs are Unicode symbol characters ("So"), skin-tone modifiers are "Sk". Maths signs
 # such as + and = are "Sm" and stay allowed.
 _UNSPEAKABLE_CATEGORIES = {"So", "Sk"}
-# Brackets are banned too, so generated text cannot carry voice directions such as "[whisper]"
-# into text-to-speech (D-023).
-_FORMATTING_MARKS = ("*", "`", "#", "[", "]")
+# Brackets and angle brackets are banned too, so generated text cannot carry voice directions
+# such as "[whisper]" (Orpheus, D-023) or "<emotion value=...>" (Cartesia, D-024) into speech.
+_FORMATTING_MARKS = ("*", "`", "#", "[", "]", "<", ">")
 
 
 def _is_speakable(text: str) -> bool:
