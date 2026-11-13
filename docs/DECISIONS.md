@@ -345,4 +345,5 @@ Owners are `TBD` until someone is assigned.
   2. "Holidays generally" still needs a reviewer's eye for inclusiveness; the prompt avoids naming specific holidays.
   3. Orpheus is a preview model; reply text (not the child's audio) is sent to Groq, which D-003 allows for adult developer testing only.
   4. Barking is spoken as words ("Woof!"); Orpheus documents no animal sounds.
+- **First live check, 2026-11-13:** with "1 to 4 sentences", barks, his name and festive cheer pushed replies over the 4-sentence limit, so they fell back (`validation:rejected:too_many_sentences`). The prompt now asks for 2 or 3 sentences, with a bark counting as one, and at most one extra (bark, name or cheer) per reply. After that, 2 of 3 test questions were answered; a riddle still ran too long. The festive cheer can feel forced ("Do you like the sky when you make a birthday cake?") and one bee fact was muddled.
 - **Decision:** Persona and voice requested by Anoushka Lalwani, project owner, 2026-11-13. Prompt, greeting and rule wording still need her approval, and a child-safety reviewer's.
