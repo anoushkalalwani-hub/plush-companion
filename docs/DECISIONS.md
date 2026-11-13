@@ -41,6 +41,7 @@ Owners are `TBD` until someone is assigned.
 | D-022 | Laptop voice simulator for adult developer testing | Proposed | Anoushka Lalwani | M3 |
 | D-023 | Winston Wags persona and Groq voice **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | Pilot |
 | D-024 | Cartesia for Winston's voice instead of Groq | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
+| D-025 | Local Kokoro voice for Winston | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
 
 ---
 
@@ -379,3 +380,19 @@ Owners are `TBD` until someone is assigned.
   - Only validated reply text or the greeting template is sent to Cartesia.
   - Output validation rejects `<` and `>` as well as brackets, so generated text can't carry Cartesia's SSML-like tags (`<emotion>`, `<speed>`, `<break>`).
 - **Decision:** Chosen by Anoushka Lalwani, project owner, 2026-11-13, for adult developer testing (D-003). Child use needs the D-003 Cartesia next steps and D-002.
+
+## D-025 — Local Kokoro voice for Winston
+
+- **Status:** Proposed: the owner chose it; she marks it Accepted
+- **PRD refs:** §5.1, §5.2, §9
+- **Context:** The owner wanted a natural voice for Groq's replies without the macOS voice and without another provider's API key. Groq Orpheus is blocked on terms (D-023), and Cartesia needs a key (D-024).
+- **Choice:**
+  - Kokoro-82M runs locally through `kokoro-onnx`. The model is Apache 2.0, the package MIT, and it sits in the optional `voice` dependency group.
+  - Voice `bm_fable`, chosen by the owner. British English, graded C in Kokoro's voice list.
+  - It is the simulator's default when `KOKORO_MODEL_PATH` is set, with the macOS voice as backup.
+  - Model files come from the kokoro-onnx GitHub release `model-files-v1.1`: `kokoro-v1.0.onnx` and `voices-v1.0.bin`. They are downloaded into the git-ignored `models/kokoro/` folder.
+- **Why it suits the product:**
+  - No text or audio leaves the machine for speech, so there are no D-003 terms to meet and no cost.
+  - It takes about 3 s to load and about 1.5 s per reply on an Apple-silicon laptop.
+  - Whether it runs fast enough on a Raspberry Pi is an M4 question.
+- **Decision:** Kokoro with `bm_fable` chosen by Anoushka Lalwani, project owner, 2026-11-13.

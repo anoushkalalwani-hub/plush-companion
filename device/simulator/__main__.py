@@ -34,9 +34,11 @@ from backend.safety.layered_validator import LayeredValidator
 from backend.safety.policy_engine import PolicyConfig
 from backend.safety.templates import WINSTON_GREETING
 from backend.sessions.store import SessionStore
+from backend.speech.base import SpeechError
 from backend.speech.cartesia import CartesiaConfig, CartesiaSpeaker, CartesiaTTS
 from backend.speech.groq_orpheus import GroqOrpheus, GroqVoiceConfig, GroqVoiceSpeaker
 from backend.speech.groq_whisper import GroqSpeechConfig, GroqWhisper
+from backend.speech.kokoro_local import KokoroConfig, KokoroSpeaker, KokoroTTS
 from backend.speech.macos_say import MacSaySpeaker
 from device.audio.cues import play_thinking_cue
 from device.audio.microphone import pcm_to_wav, record_until_enter
@@ -71,13 +73,19 @@ def _show(turn: Turn) -> None:
 
 async def _chat(args: argparse.Namespace) -> int:
     if args.speaker is None:
-        # Cartesia when its settings are present (D-024), otherwise the macOS voice.
-        args.speaker = "cartesia" if os.environ.get("CARTESIA_API_KEY") else "mac"
+        # The local Kokoro voice when configured (D-025), then Cartesia (D-024), then macOS.
+        if os.environ.get("KOKORO_MODEL_PATH"):
+            args.speaker = "kokoro"
+        elif os.environ.get("CARTESIA_API_KEY"):
+            args.speaker = "cartesia"
+        else:
+            args.speaker = "mac"
     try:
         groq = GroqConfig.from_env()
         speech = None if args.type else GroqSpeechConfig.from_env()
         voice = GroqVoiceConfig.from_env() if args.speaker == "groq" else None
         cartesia = CartesiaConfig.from_env() if args.speaker == "cartesia" else None
+        kokoro = KokoroConfig.from_env() if args.speaker == "kokoro" else None
     except (GroqConfigError, ValueError) as exc:
         print(f"Missing settings in .env ({exc}).", file=sys.stderr)
         print(
@@ -113,7 +121,20 @@ async def _chat(args: argparse.Namespace) -> int:
     )
     mac_voice = MacSaySpeaker(voice=args.voice if args.speaker == "mac" else None, rate=args.rate)
     tts: GroqOrpheus | CartesiaTTS | None = None
-    if cartesia:
+    if kokoro:
+        if args.voice:
+            kokoro = replace(kokoro, voice=args.voice)
+        print("Loading Winston's voice...")
+        try:
+            local = KokoroTTS(kokoro)
+        except SpeechError as exc:
+            print(f"Kokoro voice unavailable ({exc}).", file=sys.stderr)
+            await client.aclose()
+            if stt:
+                await stt.aclose()
+            return 2
+        speaker = FallbackSpeaker(KokoroSpeaker(local, player=play_wav), mac_voice)
+    elif cartesia:
         if args.voice:
             cartesia = replace(cartesia, voice_id=args.voice)
         tts = CartesiaTTS(cartesia)
@@ -171,15 +192,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--type", action="store_true", help="type questions instead of speaking")
     parser.add_argument(
         "--speaker",
-        choices=["cartesia", "groq", "mac"],
+        choices=["kokoro", "cartesia", "groq", "mac"],
         default=None,
-        help="cartesia: Winston's Cartesia voice (default when CARTESIA_API_KEY is set); "
-        "groq: Groq Orpheus; mac: the macOS voice only (default otherwise). Cartesia and Groq "
-        "fall back to the macOS voice if they fail.",
+        help="kokoro: local voice, nothing sent anywhere (default when KOKORO_MODEL_PATH is "
+        "set); cartesia: Cartesia (default when CARTESIA_API_KEY is set); groq: Groq Orpheus; "
+        "mac: the macOS voice only. All but mac fall back to the macOS voice if they fail.",
     )
     parser.add_argument(
         "--voice",
-        help="override the voice: a Cartesia voice ID, a Groq voice (autumn, diana, hannah, "
+        help="override the voice: a Kokoro voice (e.g. bm_fable), a Cartesia voice ID, a Groq "
+        "voice (autumn, diana, hannah, "
         "austin, daniel, troy), or, with --speaker mac, "
         "a macOS voice name (see: say -v '?')",
     )
