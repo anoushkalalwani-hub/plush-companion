@@ -169,3 +169,8 @@ def test_emoji_and_formatting_are_rejected(text):
 )
 def test_ordinary_punctuation_is_speakable(text):
     assert check_output(text) is None
+
+
+@pytest.mark.parametrize("text", ["[whisper] Come closer.", "Hello [laughs] there."])
+def test_brackets_are_rejected_so_replies_cannot_steer_the_voice(text):
+    assert check_output(text) == "not_speakable"

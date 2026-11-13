@@ -39,6 +39,7 @@ Owners are `TBD` until someone is assigned.
 | D-020 | Reply length limit vs. stories, songs and lists | Open | TBD | Pilot |
 | D-021 | Harmless inputs over-blocked by moderation and rules **[safety]** | Open | TBD | Pilot |
 | D-022 | Laptop voice simulator for adult developer testing | Proposed | Anoushka Lalwani | M3 |
+| D-023 | Winston Wags persona and Groq voice **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | Pilot |
 
 ---
 
@@ -328,3 +329,20 @@ Owners are `TBD` until someone is assigned.
   3. Emoji in replies are read aloud by `say` (D-018).
   4. The API app still refuses live mode; only this simulator and the adversarial tool use Groq.
 - **Decision:** —
+
+## D-023 — Winston Wags persona and Groq voice **[safety]**
+
+- **Status:** Proposed: implemented, wording awaiting approval
+- **PRD refs:** §6.2, §7.5, §13
+- **Request (project owner, 2026-11-13):** a voice that sounds human rather than robotic, and a personality: an old dog named Winston Wags, holiday-themed but about holidays generally rather than Christmas, who barks now and then and introduces himself.
+- **Implemented (agent-drafted, unreviewed):**
+  - **Persona:** `SYSTEM_PROMPT` in `backend/conversation/prompts.py`. Winston is a cozy plush toy dog who talks like a gentle old pup, barks now and then, mentions his name, and loves celebrations of every kind without singling out one holiday. He answers the child's question first and adds festive cheer only when it fits. All PRD §6.2 rules stay, and he is told his old-pup charm is pretend: no claims to eat, sleep, have a family, or remember real events.
+  - **Greeting:** template `WINSTON_GREETING` in `backend/safety/templates.py`, spoken once when the simulator starts. It passes the deterministic output rules.
+  - **Voice:** Groq Orpheus (`canopylabs/orpheus-v1-english`, preview), voice `troy` by default, with one fixed vocal direction, `[warm]`, chosen in code. Replies are split at sentence boundaries to fit the 200-character limit without changing words. If the Groq voice fails, the macOS voice says the same text.
+  - **Brackets banned in replies:** output validation now rejects `[` and `]`, so generated text cannot carry its own voice directions.
+- **Risks to check in the next adversarial run:**
+  1. The validator judge's persona and category checks may reject replies that drift into holiday talk or describe Winston like a real dog, causing more fallbacks.
+  2. "Holidays generally" still needs a reviewer's eye for inclusiveness; the prompt avoids naming specific holidays.
+  3. Orpheus is a preview model; reply text (not the child's audio) is sent to Groq, which D-003 allows for adult developer testing only.
+  4. Barking is spoken as words ("Woof!"); Orpheus documents no animal sounds.
+- **Decision:** Persona and voice requested by Anoushka Lalwani, project owner, 2026-11-13. Prompt, greeting and rule wording still need her approval, and a child-safety reviewer's.

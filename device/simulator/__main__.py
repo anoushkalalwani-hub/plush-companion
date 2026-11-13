@@ -15,6 +15,7 @@ import argparse
 import asyncio
 import importlib.util
 import sys
+from dataclasses import replace
 
 from backend.audit.events import AuditLogger
 from backend.config import Settings
@@ -30,12 +31,16 @@ from backend.llm.groq import (
 from backend.safety.layered_classifier import LayeredClassifier
 from backend.safety.layered_validator import LayeredValidator
 from backend.safety.policy_engine import PolicyConfig
+from backend.safety.templates import WINSTON_GREETING
 from backend.sessions.store import SessionStore
+from backend.speech.groq_orpheus import GroqOrpheus, GroqVoiceConfig, GroqVoiceSpeaker
 from backend.speech.groq_whisper import GroqSpeechConfig, GroqWhisper
 from backend.speech.macos_say import MacSaySpeaker
 from device.audio.cues import play_thinking_cue
 from device.audio.microphone import pcm_to_wav, record_until_enter
+from device.audio.playback import play_wav
 from device.simulator.chat import Turn, text_turn, voice_turn
+from device.simulator.voices import FallbackSpeaker
 
 DEVICE_ID = "laptop-simulator"
 # D-005: no min_confidence has been chosen. This is the value the live adversarial runs used,
@@ -43,7 +48,7 @@ DEVICE_ID = "laptop-simulator"
 DEFAULT_THRESHOLD = 0.5
 
 BANNER = """\
-Plush companion: laptop voice simulator
+Winston Wags: laptop voice simulator
   For adult developer testing only (D-003). Never let a child use this.
   Speech goes to Groq. Replies pass the full safety pipeline.
   Confidence threshold {threshold:.2f} (evaluation value; D-005 not yet chosen).
@@ -66,6 +71,7 @@ async def _chat(args: argparse.Namespace) -> int:
     try:
         groq = GroqConfig.from_env()
         speech = None if args.type else GroqSpeechConfig.from_env()
+        voice = GroqVoiceConfig.from_env() if args.speaker == "groq" else None
     except (GroqConfigError, ValueError) as exc:
         print(f"Missing Groq settings in .env ({exc}).", file=sys.stderr)
         print(
@@ -73,9 +79,11 @@ async def _chat(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    if not args.type and importlib.util.find_spec("sounddevice") is None:
+    needs_audio = not args.type or args.speaker == "groq"
+    if needs_audio and importlib.util.find_spec("sounddevice") is None:
         print(
-            "Spoken input needs the voice packages: add --group voice, or use --type.",
+            "The microphone and Groq voice need the voice packages: add --group voice, or use "
+            "--type --speaker mac.",
             file=sys.stderr,
         )
         return 2
@@ -97,7 +105,15 @@ async def _chat(args: argparse.Namespace) -> int:
         settings=settings,
         policy_config=PolicyConfig(min_confidence=args.threshold),
     )
-    speaker = MacSaySpeaker(voice=args.voice, rate=args.rate)
+    mac_voice = MacSaySpeaker(voice=None if voice else args.voice, rate=args.rate)
+    tts = None
+    if voice:
+        if args.voice:
+            voice = replace(voice, voice=args.voice)
+        tts = GroqOrpheus(voice)
+        speaker = FallbackSpeaker(GroqVoiceSpeaker(tts, player=play_wav), mac_voice)
+    else:
+        speaker = mac_voice
     session = sessions.create(device_id=DEVICE_ID)
 
     print(BANNER.format(threshold=args.threshold))
@@ -106,6 +122,9 @@ async def _chat(args: argparse.Namespace) -> int:
     else:
         print("Press Enter to start talking, Enter again to stop. Type q then Enter to quit.\n")
     try:
+        # A predefined template (invariant 4), spoken once at the start.
+        print(f"  Toy:  {WINSTON_GREETING.text}\n")
+        await speaker.speak(WINSTON_GREETING.text)
         while True:
             if args.type:
                 text = (await asyncio.to_thread(input, "> ")).strip()
@@ -130,6 +149,8 @@ async def _chat(args: argparse.Namespace) -> int:
         await client.aclose()
         if stt:
             await stt.aclose()
+        if tts:
+            await tts.aclose()
     print("Bye!")
     return 0
 
@@ -137,8 +158,19 @@ async def _chat(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Talk to the plush companion in your terminal.")
     parser.add_argument("--type", action="store_true", help="type questions instead of speaking")
-    parser.add_argument("--voice", help="macOS voice name (see: say -v '?')")
-    parser.add_argument("--rate", type=int, help="speaking rate in words per minute")
+    parser.add_argument(
+        "--speaker",
+        choices=["groq", "mac"],
+        default="groq",
+        help="groq: natural Groq voice, falling back to macOS if it fails (default); "
+        "mac: the macOS voice only",
+    )
+    parser.add_argument(
+        "--voice",
+        help="Groq voice (autumn, diana, hannah, austin, daniel, troy) or, with --speaker mac, "
+        "a macOS voice name (see: say -v '?')",
+    )
+    parser.add_argument("--rate", type=int, help="macOS voice speaking rate in words per minute")
     parser.add_argument(
         "--no-chime",
         dest="chime",

@@ -84,7 +84,7 @@ Talk to the companion in your terminal (macOS; adult developer testing only, D-0
 uv run --group voice --env-file .env python -m device.simulator
 ```
 
-Press Enter to start talking and Enter again to stop. A short chime plays while the toy is thinking (`--no-chime` turns it off). Add `--rate 200` for faster speech, `--type` to type instead of speaking, `--voice NAME` to pick a macOS voice (`say -v '?'` lists them), or `--threshold` to change the confidence threshold (default 0.50, an evaluation value, D-005). Each turn uses about two moderation calls, so the Groq free tier allows roughly 100 turns a day.
+Press Enter to start talking and Enter again to stop. Winston Wags greets you, then answers in a Groq voice (D-023); accept the Orpheus model's terms in the Groq console first. If the Groq voice fails, the macOS voice takes over. A short chime plays while he's thinking (`--no-chime` turns it off). `--voice` picks a Groq voice (autumn, diana, hannah, austin, daniel, troy), `--speaker mac` uses only the macOS voice (`--rate 200` speeds it up), `--type` to type instead of speaking, `--voice NAME` to pick a macOS voice (`say -v '?'` lists them), or `--threshold` to change the confidence threshold (default 0.50, an evaluation value, D-005). Each turn uses about two moderation calls, so the Groq free tier allows roughly 100 turns a day.
 
 All providers default to fake implementations. Live providers are enabled per provider through environment variables, and only after D-003 is answered for that provider.
 
