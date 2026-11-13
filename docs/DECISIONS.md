@@ -19,7 +19,7 @@ Owners are `TBD` until someone is assigned.
 |---|---|---|---|---|
 | D-001 | Build order: safety gates from milestone 1 | Proposed | TBD | M1 |
 | D-002 | Children's privacy law (COPPA / GDPR-K) and parental consent | Open | TBD | Any use by a real child |
-| D-003 | Provider terms and data retention for child-directed use | Open: findings recorded, ZDR request needed | Anoushka Lalwani | Live providers with real input |
+| D-003 | Provider terms and data retention for child-directed use | Open: Groq approved for adult developer testing only; child use needs ZDR and D-002 | Anoushka Lalwani | Live providers with real input |
 | D-004 | Sensitive-disclosure response templates and reviewer **[safety]** | Open | TBD | M2 restricted categories |
 | D-005 | Input classification layers and precedence **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-006 | Meaning of "independent" output validation **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
@@ -38,6 +38,7 @@ Owners are `TBD` until someone is assigned.
 | D-019 | Classifier timeout too short for the live judge | Open | TBD | M2 exit |
 | D-020 | Reply length limit vs. stories, songs and lists | Open | TBD | Pilot |
 | D-021 | Harmless inputs over-blocked by moderation and rules **[safety]** | Open | TBD | Pilot |
+| D-022 | Laptop voice simulator for adult developer testing | Proposed | Anoushka Lalwani | M3 |
 
 ---
 
@@ -133,7 +134,7 @@ Owners are `TBD` until someone is assigned.
   1. Confirm the account holder is 18 or older.
   2. Turn on ZDR for the organization before any real child's speech is sent.
   3. Re-check the model list before the pilot, because preview models can be withdrawn.
-- **Decision:** —
+- **Decision (Groq, partial):** Groq approved for **adult developer testing only** (the developer's own voice and questions, through the laptop voice simulator, D-022) by Anoushka Lalwani, project owner, 2026-11-13. Not approved for any child's speech or data. ZDR (Groq next step 2) and the D-002 consent questions must be answered before any child uses it.
 
 ## D-004 — Sensitive-disclosure response templates **[safety]**
 
@@ -308,4 +309,18 @@ Owners are `TBD` until someone is assigned.
   1. Is a child's first name on its own personal information? The PRD §7.4 examples pair names with addresses or schools.
   2. Should moderation's family conflict and bullying labels need corroboration from another layer before they block, or is over-blocking those acceptable for safety?
 - **Recommendation:** Narrow the two keyword rules (they are deterministic and easy to fix with tests), and leave the moderation policy and first-name question to the child-safety reviewer. Any change must be rerun against the full adversarial suite.
+- **Decision:** —
+
+## D-022 — Laptop voice simulator for adult developer testing
+
+- **Status:** Proposed
+- **PRD refs:** §5.1, §9, §14 (M3: laptop device simulator)
+- **Context:** The project owner asked for a way to talk to the companion from a terminal before M2 is finished. This is the M3 laptop simulator, built early.
+- **Choices made by the project owner, 2026-11-13:** spoken questions through the laptop microphone, transcribed by Groq Whisper (`whisper-large-v3-turbo`); replies spoken by macOS `say`; Groq used live for the adult developer only (D-003).
+- **How it works:** `python -m device.simulator` runs the real pipeline in-process (three-layer classifier, policy engine, Groq generation, three-part validator). Audio is captured into memory, wrapped as WAV in memory, and sent to Groq; it is never written to disk. `say` runs locally, so no reply audio leaves the laptop. Only the conversation manager's reply (validated text or a template) is spoken; a speech-to-text failure or timeout speaks the generic fallback. The terminal shows the transcript and reply as the chat itself; nothing is logged.
+- **Not settled:**
+  1. The simulator uses confidence threshold 0.50 by default, the value from the live adversarial runs. It is labelled as an evaluation value in the banner; D-005's real `min_confidence` is still to be chosen.
+  2. On the real device, speech-to-text and text-to-speech belong to the backend (`transcribe`, `synthesize`), not the device. `say` stands in for the device speaker here. The device-to-backend audio path is still M3 work.
+  3. Emoji in replies are read aloud by `say` (D-018).
+  4. The API app still refuses live mode; only this simulator and the adversarial tool use Groq.
 - **Decision:** —
