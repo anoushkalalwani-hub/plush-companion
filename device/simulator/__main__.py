@@ -14,6 +14,7 @@ written to disk.
 import argparse
 import asyncio
 import importlib.util
+import os
 import sys
 from dataclasses import replace
 
@@ -69,13 +70,16 @@ def _show(turn: Turn) -> None:
 
 
 async def _chat(args: argparse.Namespace) -> int:
+    if args.speaker is None:
+        # Cartesia when its settings are present (D-024), otherwise the macOS voice.
+        args.speaker = "cartesia" if os.environ.get("CARTESIA_API_KEY") else "mac"
     try:
         groq = GroqConfig.from_env()
         speech = None if args.type else GroqSpeechConfig.from_env()
         voice = GroqVoiceConfig.from_env() if args.speaker == "groq" else None
         cartesia = CartesiaConfig.from_env() if args.speaker == "cartesia" else None
     except (GroqConfigError, ValueError) as exc:
-        print(f"Missing Groq settings in .env ({exc}).", file=sys.stderr)
+        print(f"Missing settings in .env ({exc}).", file=sys.stderr)
         print(
             "Run with: uv run --group voice --env-file .env python -m device.simulator",
             file=sys.stderr,
@@ -168,9 +172,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--speaker",
         choices=["cartesia", "groq", "mac"],
-        default="cartesia",
-        help="cartesia: Winston's Cartesia voice (default); groq: Groq Orpheus; mac: the macOS "
-        "voice only. Cartesia and Groq fall back to the macOS voice if they fail.",
+        default=None,
+        help="cartesia: Winston's Cartesia voice (default when CARTESIA_API_KEY is set); "
+        "groq: Groq Orpheus; mac: the macOS voice only (default otherwise). Cartesia and Groq "
+        "fall back to the macOS voice if they fail.",
     )
     parser.add_argument(
         "--voice",
