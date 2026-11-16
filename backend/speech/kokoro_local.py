@@ -61,7 +61,7 @@ def float_to_wav(samples: Sequence[float], sample_rate: int) -> bytes:
     return buffer.getvalue()
 
 
-def _load_engine(config: KokoroConfig) -> Engine:
+def load_engine(config: KokoroConfig) -> Engine:
     for path, what in ((config.model_path, "model"), (config.voices_path, "voices")):
         if not Path(path).is_file():
             raise SpeechError(f"kokoro {what} file not found")
@@ -73,7 +73,7 @@ def _load_engine(config: KokoroConfig) -> Engine:
 class KokoroTTS:
     def __init__(self, config: KokoroConfig, engine: Engine | None = None) -> None:
         self._config = config
-        self._engine = engine or _load_engine(config)
+        self._engine = engine or load_engine(config)
 
     async def synthesize(self, text: str) -> bytes:
         if not text.strip():

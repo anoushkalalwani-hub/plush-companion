@@ -54,3 +54,29 @@ async def test_main_voice_is_used_when_it_works():
     main, backup = FakeSpeaker(), FakeSpeaker()
     await FallbackSpeaker(main, backup).speak("Woof!")
     assert main.spoken == ["Woof!"] and backup.spoken == []
+
+
+async def test_voice_preview_plays_each_voice_in_order_and_reports_failures(monkeypatch, capsys):
+    import asyncio
+
+    from device.simulator import voice_preview
+
+    async def no_sleep(_):
+        return None
+
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    played = []
+
+    async def synthesize_for(voice):
+        if voice == "bad":
+            raise SpeechError("kokoro failed: KeyError")
+        return voice.encode()
+
+    async def play(wav):
+        played.append(wav.decode())
+
+    failed = await voice_preview.preview(["am_fenrir", "bad", "bm_george"], synthesize_for, play)
+    assert played == ["am_fenrir", "bm_george"]
+    assert failed == ["bad"]
+    out = capsys.readouterr().out
+    assert "[1/3] am_fenrir" in out and "could not play bad" in out
