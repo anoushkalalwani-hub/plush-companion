@@ -38,7 +38,12 @@ async def preview(
 
 
 async def _main(voices: Sequence[str]) -> int:
-    from device.audio.playback import play_wav
+    import os
+
+    from device.audio.devices import device_from_text
+    from device.audio.playback import player_for
+
+    play_wav = player_for(device_from_text(os.environ.get("AUDIO_OUTPUT_DEVICE")))
 
     try:
         config = KokoroConfig.from_env()

@@ -23,10 +23,17 @@ def pcm_to_wav(pcm: bytes, sample_rate: int = SAMPLE_RATE) -> bytes:
     return buffer.getvalue()
 
 
-def record_until_enter(sample_rate: int = SAMPLE_RATE, max_seconds: float = MAX_SECONDS) -> bytes:
-    """Record 16-bit mono PCM until the user presses Enter. Audio past max_seconds is dropped."""
+def record_until_enter(device=None, max_seconds: float = MAX_SECONDS) -> tuple[bytes, int]:
+    """Record 16-bit mono PCM until the user presses Enter; return (pcm, sample_rate).
+
+    Records at the microphone's preferred rate, which USB microphones always support; Whisper
+    accepts any rate. Audio past max_seconds is dropped.
+    """
     import sounddevice  # Optional "voice" dependency group; only needed for spoken input.
 
+    from device.audio.devices import default_rate
+
+    sample_rate = default_rate(device, "input")
     limit = int(sample_rate * max_seconds) * 2
     chunks: list[bytes] = []
     size = 0
@@ -39,9 +46,9 @@ def record_until_enter(sample_rate: int = SAMPLE_RATE, max_seconds: float = MAX_
             size += len(chunk)
 
     with sounddevice.RawInputStream(
-        samplerate=sample_rate, channels=1, dtype="int16", callback=on_audio
+        samplerate=sample_rate, channels=1, dtype="int16", device=device, callback=on_audio
     ):
         sys.stdin.readline()
     if size >= limit:
         print(f"  (stopped listening after {max_seconds:.0f} seconds)")
-    return b"".join(chunks)
+    return b"".join(chunks), sample_rate

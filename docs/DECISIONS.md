@@ -42,6 +42,7 @@ Owners are `TBD` until someone is assigned.
 | D-023 | Winston Wags persona and Groq voice **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | Pilot |
 | D-024 | Cartesia for Winston's voice instead of Groq | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
 | D-025 | Local Kokoro voice for Winston | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
+| D-026 | Running the whole simulator on a Raspberry Pi, keys included **[safety]** | Proposed: owner's choice, exception to a project rule | Anoushka Lalwani | Before any child use |
 
 ---
 
@@ -397,3 +398,25 @@ Owners are `TBD` until someone is assigned.
   - Whether it runs fast enough on a Raspberry Pi is an M4 question.
 - **Decision:** Kokoro with `bm_fable` chosen by Anoushka Lalwani, project owner, 2026-11-13.
 - **Update 2026-11-16:** after previewing six voices, the owner switched Winston to `am_michael` (American English, warm male, graded C+).
+
+## D-026 — Running the whole simulator on a Raspberry Pi, keys included **[safety]**
+
+- **Status:** Proposed: the owner's choice; it is an exception to a project rule
+- **PRD refs:** §4.1, §9, §14 (M4)
+- **Conflict:** AGENTS.md and PRD §9 say provider API keys never go on the device. The owner chose to run the full laptop simulator on a Raspberry Pi (4 or 5) for adult developer testing. That means the Pi's `.env` holds the Groq key. The owner was offered the alternative (the Pi as a thin device talking to a backend on the laptop) and chose this instead.
+- **Setup chosen by the owner, 2026-11-16:**
+  - Everything runs on the Pi.
+  - Winston's voice is made on the Pi by Kokoro (D-025).
+  - Questions come in through a USB microphone, and replies play through a USB speaker (an LLR054 plug-and-play USB speaker).
+- **Conditions for the exception:**
+  1. Adult developer testing only (D-003). No child uses this Pi.
+  2. The Pi stays physically with the developer. Its `.env` is never committed or copied anywhere else.
+  3. Revoke and replace the Groq key if the Pi or its SD card leaves the developer's hands.
+  4. Before any child uses a Pi, it must become a thin device client with no keys, talking to a backend (the PRD design). That is still M4/M5 work.
+- **Code changes:**
+  - Audio devices can be chosen by name.
+  - Playback and recording adapt to the sample rates USB devices support.
+  - The backup voice is espeak-ng on Linux and `say` on macOS.
+  - The thinking chime is generated in memory on both.
+  - Nothing here changes the safety pipeline.
+- **Decision:** Chosen by Anoushka Lalwani, project owner, 2026-11-16, for adult developer testing only. She marks it Accepted; a child-safety reviewer should see it before the pilot.

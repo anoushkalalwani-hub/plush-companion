@@ -24,6 +24,7 @@ uv run --group voice --env-file .env python -m device.simulator
 | [Safety policy](docs/SAFETY_POLICY.md) | Category policies and templates (unreviewed skeleton) |
 | [API spec](docs/API_SPEC.md) | Endpoints |
 | [Development](docs/DEVELOPMENT.md) | Milestones, workflow, tests |
+| [Raspberry Pi](docs/RASPBERRY_PI.md) | Running Winston on a Pi with a USB mic and speaker |
 
 ## Layout
 

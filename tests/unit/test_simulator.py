@@ -135,21 +135,6 @@ def test_simulator_refuses_an_out_of_range_threshold():
         main(["--type", "--threshold", "2"])
 
 
-async def test_thinking_cue_plays_a_system_sound_and_never_raises(monkeypatch):
-    from device.audio import cues
-
-    calls = []
-
-    async def fake_exec(*args, **kwargs):
-        calls.append(args)
-        raise FileNotFoundError("afplay")
-
-    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
-    await cues.play_thinking_cue()  # Must not raise when afplay is missing.
-    assert calls and calls[0][0] == "afplay"
-    assert calls[0][1].endswith(".aiff")
-
-
 def test_cartesia_is_requested_without_a_key_only_by_flag(monkeypatch, capsys):
     from device.simulator.__main__ import main
 
