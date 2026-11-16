@@ -388,7 +388,7 @@ Owners are `TBD` until someone is assigned.
 - **Context:** The owner wanted a natural voice for Groq's replies without the macOS voice and without another provider's API key. Groq Orpheus is blocked on terms (D-023), and Cartesia needs a key (D-024).
 - **Choice:**
   - Kokoro-82M runs locally through `kokoro-onnx`. The model is Apache 2.0, the package MIT, and it sits in the optional `voice` dependency group.
-  - Voice `bm_fable`, chosen by the owner. British English, graded C in Kokoro's voice list.
+  - Voice `am_michael` (first `bm_fable`), chosen by the owner by ear.
   - It is the simulator's default when `KOKORO_MODEL_PATH` is set, with the macOS voice as backup.
   - Model files come from the kokoro-onnx GitHub release `model-files-v1.1`: `kokoro-v1.0.onnx` and `voices-v1.0.bin`. They are downloaded into the git-ignored `models/kokoro/` folder.
 - **Why it suits the product:**
@@ -396,3 +396,4 @@ Owners are `TBD` until someone is assigned.
   - It takes about 3 s to load and about 1.5 s per reply on an Apple-silicon laptop.
   - Whether it runs fast enough on a Raspberry Pi is an M4 question.
 - **Decision:** Kokoro with `bm_fable` chosen by Anoushka Lalwani, project owner, 2026-11-13.
+- **Update 2026-11-16:** after previewing six voices, the owner switched Winston to `am_michael` (American English, warm male, graded C+).
