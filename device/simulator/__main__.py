@@ -14,7 +14,9 @@ written to disk.
 import argparse
 import asyncio
 import importlib.util
+import os
 import sys
+from dataclasses import replace
 
 from backend.audit.events import AuditLogger
 from backend.config import Settings
@@ -30,11 +32,19 @@ from backend.llm.groq import (
 from backend.safety.layered_classifier import LayeredClassifier
 from backend.safety.layered_validator import LayeredValidator
 from backend.safety.policy_engine import PolicyConfig
+from backend.safety.templates import WINSTON_GREETING
 from backend.sessions.store import SessionStore
+from backend.speech.base import SpeechError
+from backend.speech.cartesia import CartesiaConfig, CartesiaSpeaker, CartesiaTTS
+from backend.speech.groq_orpheus import GroqOrpheus, GroqVoiceConfig, GroqVoiceSpeaker
 from backend.speech.groq_whisper import GroqSpeechConfig, GroqWhisper
-from backend.speech.macos_say import MacSaySpeaker
+from backend.speech.kokoro_local import KokoroConfig, KokoroSpeaker, KokoroTTS
+from device.audio.cues import play_thinking_cue
+from device.audio.devices import device_from_text, list_devices
 from device.audio.microphone import pcm_to_wav, record_until_enter
+from device.audio.playback import player_for
 from device.simulator.chat import Turn, text_turn, voice_turn
+from device.simulator.voices import FallbackSpeaker, backup_speaker
 
 DEVICE_ID = "laptop-simulator"
 # D-005: no min_confidence has been chosen. This is the value the live adversarial runs used,
@@ -42,7 +52,7 @@ DEVICE_ID = "laptop-simulator"
 DEFAULT_THRESHOLD = 0.5
 
 BANNER = """\
-Plush companion: laptop voice simulator
+Winston Wags: laptop voice simulator
   For adult developer testing only (D-003). Never let a child use this.
   Speech goes to Groq. Replies pass the full safety pipeline.
   Confidence threshold {threshold:.2f} (evaluation value; D-005 not yet chosen).
@@ -62,22 +72,40 @@ def _show(turn: Turn) -> None:
 
 
 async def _chat(args: argparse.Namespace) -> int:
+    if args.speaker == "mac":
+        args.speaker = "system"
+    if args.speaker is None:
+        # Kokoro when configured (D-025), then Cartesia (D-024), then the system voice.
+        if os.environ.get("KOKORO_MODEL_PATH"):
+            args.speaker = "kokoro"
+        elif os.environ.get("CARTESIA_API_KEY"):
+            args.speaker = "cartesia"
+        else:
+            args.speaker = "system"
     try:
         groq = GroqConfig.from_env()
         speech = None if args.type else GroqSpeechConfig.from_env()
+        voice = GroqVoiceConfig.from_env() if args.speaker == "groq" else None
+        cartesia = CartesiaConfig.from_env() if args.speaker == "cartesia" else None
+        kokoro = KokoroConfig.from_env() if args.speaker == "kokoro" else None
     except (GroqConfigError, ValueError) as exc:
-        print(f"Missing Groq settings in .env ({exc}).", file=sys.stderr)
+        print(f"Missing settings in .env ({exc}).", file=sys.stderr)
         print(
             "Run with: uv run --group voice --env-file .env python -m device.simulator",
             file=sys.stderr,
         )
         return 2
-    if not args.type and importlib.util.find_spec("sounddevice") is None:
+    needs_audio = not args.type or args.speaker != "system"
+    if needs_audio and importlib.util.find_spec("sounddevice") is None:
         print(
-            "Spoken input needs the voice packages: add --group voice, or use --type.",
+            "The microphone and these voices need the voice packages: add --group voice, or use "
+            "--type --speaker system.",
             file=sys.stderr,
         )
         return 2
+    input_device = device_from_text(args.input_device or os.environ.get("AUDIO_INPUT_DEVICE"))
+    output_device = device_from_text(args.output_device or os.environ.get("AUDIO_OUTPUT_DEVICE"))
+    play = player_for(output_device)
 
     settings = Settings.from_env()
     client = GroqClient(groq)
@@ -96,7 +124,35 @@ async def _chat(args: argparse.Namespace) -> int:
         settings=settings,
         policy_config=PolicyConfig(min_confidence=args.threshold),
     )
-    speaker = MacSaySpeaker(voice=args.voice, rate=args.rate)
+    system_voice = backup_speaker(
+        voice=args.voice if args.speaker == "system" else None, rate=args.rate
+    )
+    tts: GroqOrpheus | CartesiaTTS | None = None
+    if kokoro:
+        if args.voice:
+            kokoro = replace(kokoro, voice=args.voice)
+        print("Loading Winston's voice...")
+        try:
+            local = KokoroTTS(kokoro)
+        except SpeechError as exc:
+            print(f"Kokoro voice unavailable ({exc}).", file=sys.stderr)
+            await client.aclose()
+            if stt:
+                await stt.aclose()
+            return 2
+        speaker = FallbackSpeaker(KokoroSpeaker(local, player=play), system_voice)
+    elif cartesia:
+        if args.voice:
+            cartesia = replace(cartesia, voice_id=args.voice)
+        tts = CartesiaTTS(cartesia)
+        speaker = FallbackSpeaker(CartesiaSpeaker(tts, player=play), system_voice)
+    elif voice:
+        if args.voice:
+            voice = replace(voice, voice=args.voice)
+        tts = GroqOrpheus(voice)
+        speaker = FallbackSpeaker(GroqVoiceSpeaker(tts, player=play), system_voice)
+    else:
+        speaker = system_voice
     session = sessions.create(device_id=DEVICE_ID)
 
     print(BANNER.format(threshold=args.threshold))
@@ -105,19 +161,26 @@ async def _chat(args: argparse.Namespace) -> int:
     else:
         print("Press Enter to start talking, Enter again to stop. Type q then Enter to quit.\n")
     try:
+        # A predefined template (invariant 4), spoken once at the start.
+        print(f"  Toy:  {WINSTON_GREETING.text}\n")
+        await speaker.speak(WINSTON_GREETING.text)
         while True:
             if args.type:
                 text = (await asyncio.to_thread(input, "> ")).strip()
                 if not text:
                     break
+                if args.chime:
+                    await play_thinking_cue(play)
                 turn = await text_turn(text, manager, session, speaker)
             else:
                 command = (await asyncio.to_thread(input, "[Enter] to talk > ")).strip()
                 if command.lower() in {"q", "quit", "exit"}:
                     break
                 print("  Listening... press Enter when you're done.")
-                pcm = await asyncio.to_thread(record_until_enter)
-                turn = await voice_turn(pcm_to_wav(pcm), stt, manager, session, speaker)
+                pcm, rate = await asyncio.to_thread(record_until_enter, input_device)
+                if args.chime:
+                    await play_thinking_cue(play)
+                turn = await voice_turn(pcm_to_wav(pcm, rate), stt, manager, session, speaker)
             _show(turn)
     except (KeyboardInterrupt, EOFError):
         print()
@@ -125,6 +188,8 @@ async def _chat(args: argparse.Namespace) -> int:
         await client.aclose()
         if stt:
             await stt.aclose()
+        if tts:
+            await tts.aclose()
     print("Bye!")
     return 0
 
@@ -132,8 +197,43 @@ async def _chat(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Talk to the plush companion in your terminal.")
     parser.add_argument("--type", action="store_true", help="type questions instead of speaking")
-    parser.add_argument("--voice", help="macOS voice name (see: say -v '?')")
-    parser.add_argument("--rate", type=int, help="speaking rate in words per minute")
+    parser.add_argument(
+        "--speaker",
+        choices=["kokoro", "cartesia", "groq", "system", "mac"],
+        default=None,
+        help="kokoro: local voice, nothing sent anywhere (default when KOKORO_MODEL_PATH is "
+        "set); cartesia: Cartesia (default when CARTESIA_API_KEY is set); groq: Groq Orpheus; "
+        "system: the system voice only (macOS say, or espeak-ng on Linux; mac is an alias). "
+        "The others fall back to the system voice if they fail.",
+    )
+    parser.add_argument(
+        "--voice",
+        help="override the voice: a Kokoro voice (e.g. bm_fable), a Cartesia voice ID, a Groq "
+        "voice (autumn, diana, hannah, "
+        "austin, daniel, troy), or, with --speaker system, a macOS or espeak-ng voice name",
+    )
+    parser.add_argument("--rate", type=int, help="system voice speaking rate in words per minute")
+    parser.add_argument(
+        "--input-device",
+        help="microphone: a number from --list-devices or part of its name, e.g. USB "
+        "(default: AUDIO_INPUT_DEVICE, then the system default)",
+    )
+    parser.add_argument(
+        "--output-device",
+        help="speaker: a number from --list-devices or part of its name, e.g. USB "
+        "(default: AUDIO_OUTPUT_DEVICE, then the system default)",
+    )
+    parser.add_argument(
+        "--list-devices",
+        action="store_true",
+        help="show audio devices and their numbers, then exit",
+    )
+    parser.add_argument(
+        "--no-chime",
+        dest="chime",
+        action="store_false",
+        help="don't play a sound while the toy is thinking",
+    )
     parser.add_argument(
         "--threshold",
         type=float,
@@ -141,6 +241,9 @@ def main(argv: list[str] | None = None) -> int:
         help="policy confidence threshold (default 0.5, an evaluation value; see D-005)",
     )
     args = parser.parse_args(argv)
+    if args.list_devices:
+        print(list_devices())
+        return 0
     if not 0.0 <= args.threshold <= 1.0:
         parser.error("--threshold must be between 0 and 1")
     try:

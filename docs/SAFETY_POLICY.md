@@ -15,6 +15,7 @@ PRD §15.2: agents must not invent safety policies. This file defines the *struc
 | Input rule phrases and patterns (`backend/safety/rules.py`) | Unreviewed, agent-drafted | TBD | — |
 | Output banned phrases and limits (`backend/safety/output_rules.py`) | Unreviewed, agent-drafted | TBD | — |
 | Classifier and validator judge prompts (`backend/safety/judge_prompts.py`) | Unreviewed, agent-drafted | TBD | — |
+| Winston Wags persona prompt (`backend/conversation/prompts.py`) and greeting template (D-023) | Unreviewed, agent-drafted from the owner's description | TBD | — |
 | Moderation policy for the safeguard model (`backend/safety/moderation_policy.py`, D-016) | Unreviewed, agent-drafted | TBD | — |
 | Special-handling categories (D-015) | Owner-approved, safety sign-off pending | TBD | — |
 
@@ -86,7 +87,7 @@ The device also needs its own offline fallback, stored on the device, for when t
 
 ## Output validation checks (PRD §7.5)
 
-Implemented in three parts (D-006), all of which must pass: deterministic rules (length, sentence count, personal information patterns, banned phrases), moderation of the reply, and an LLM judge that sees only the reply and its category and reports each check below.
+Implemented in three parts (D-006), all of which must pass: deterministic rules (length, sentence count, no emoji or formatting since replies are spoken (D-018), personal information patterns, banned phrases), moderation of the reply, and an LLM judge that sees only the reply and its category and reports each check below.
 
 - Age appropriateness.
 - Restricted content.

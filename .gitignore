@@ -9,3 +9,6 @@ __pycache__/
 *.mp3
 *.ogg
 *.flac
+
+# Downloaded voice models (large binaries, never committed)
+models/

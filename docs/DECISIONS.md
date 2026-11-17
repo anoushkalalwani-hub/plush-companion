@@ -19,7 +19,7 @@ Owners are `TBD` until someone is assigned.
 |---|---|---|---|---|
 | D-001 | Build order: safety gates from milestone 1 | Proposed | TBD | M1 |
 | D-002 | Children's privacy law (COPPA / GDPR-K) and parental consent | Open | TBD | Any use by a real child |
-| D-003 | Provider terms and data retention for child-directed use | Open: Groq approved for adult developer testing only; child use needs ZDR and D-002 | Anoushka Lalwani | Live providers with real input |
+| D-003 | Provider terms and data retention for child-directed use | Open: Groq and Cartesia approved for adult developer testing only; child use needs ZDR and D-002 | Anoushka Lalwani | Live providers with real input |
 | D-004 | Sensitive-disclosure response templates and reviewer **[safety]** | Open | TBD | M2 restricted categories |
 | D-005 | Input classification layers and precedence **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-006 | Meaning of "independent" output validation **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
@@ -34,11 +34,15 @@ Owners are `TBD` until someone is assigned.
 | D-015 | Special-handling categories **[safety]** | Accepted, safety sign-off pending | Anoushka Lalwani | — |
 | D-016 | AI provider: Groq instead of OpenAI | Accepted | Anoushka Lalwani | — |
 | D-017 | Prompt injection that passes every classifier layer **[safety]** | Proposed: implemented, live rerun pending | Anoushka Lalwani | M2 exit |
-| D-018 | Emoji and formatting in spoken replies **[safety]** | Open | TBD | M3 |
+| D-018 | Emoji and formatting in spoken replies **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | M3 |
 | D-019 | Classifier timeout too short for the live judge | Open | TBD | M2 exit |
 | D-020 | Reply length limit vs. stories, songs and lists | Open | TBD | Pilot |
 | D-021 | Harmless inputs over-blocked by moderation and rules **[safety]** | Open | TBD | Pilot |
 | D-022 | Laptop voice simulator for adult developer testing | Proposed | Anoushka Lalwani | M3 |
+| D-023 | Winston Wags persona and Groq voice **[safety]** | Proposed: implemented, wording awaiting approval | Anoushka Lalwani | Pilot |
+| D-024 | Cartesia for Winston's voice instead of Groq | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
+| D-025 | Local Kokoro voice for Winston | Proposed: owner's choice, awaiting her sign-off | Anoushka Lalwani | — |
+| D-026 | Running the whole simulator on a Raspberry Pi, keys included **[safety]** | Proposed: owner's choice, exception to a project rule | Anoushka Lalwani | Before any child use |
 
 ---
 
@@ -134,6 +138,22 @@ Owners are `TBD` until someone is assigned.
   1. Confirm the account holder is 18 or older.
   2. Turn on ZDR for the organization before any real child's speech is sent.
   3. Re-check the model list before the pilot, because preview models can be withdrawn.
+- **Findings: Cartesia (researched 2026-11-13; a summary, not legal advice; only reply text, never a child's audio, would be sent):**
+  - **Children:**
+    - [Terms](https://cartesia.ai/terms) (revised 2024-06-14) §1 requires account holders to be 18 or older and in the US.
+    - The [Privacy Policy](https://cartesia.ai/privacy) §8 says the services "are not intended for children". There is no child-directed program, and COPPA is not mentioned.
+    - The [AUP](https://cartesia.ai/legal/acceptable-use) (revised 2025-07-23) §2 bars output that "relates to, or appears ... to relate to or represent" anyone under 18, in Cartesia's sole discretion. Winston's voice should not sound like a child.
+  - **Training: on by default.**
+    - Terms §5.3(c): inputs and outputs "may be used by Cartesia to train" its models.
+    - Opting out uses the form at https://play.cartesia.ai/privacy/data-controls, and applies only from then on.
+  - **Retention:**
+    - No default period is stated, and Terms §5.3 allows manual review of inputs and outputs.
+    - The [DPA](https://cartesia.ai/legal) §13 offers a Zero Data Retention setting that stops storage and training. It doesn't say which plans can turn it on.
+  - **Location:** not stated. Transfers rely on the EU–US Data Privacy Framework and SCCs, and subprocessors are listed on Cartesia's Vanta trust page.
+  - **Commercial use:** depends on the subscription tier (Terms §4.1).
+  - **Unverified:** the Terms page was cut off from §8.3 onwards. Rate limits and error docs need a login.
+- **Cartesia next steps (owner):** opt out of training (or enable ZDR) before sending any text; confirm the account holder is 18 or older; check the subscription tier allows this use; have a lawyer review before any child uses it.
+- **Decision (Cartesia, partial):** Cartesia text-to-speech approved for **adult developer testing only** by Anoushka Lalwani, project owner, 2026-11-13 ("yeah add cartesia"), on the same terms as Groq. Not approved for any child's use.
 - **Decision (Groq, partial):** Groq approved for **adult developer testing only** (the developer's own voice and questions, through the laptop voice simulator, D-022) by Anoushka Lalwani, project owner, 2026-11-13. Not approved for any child's speech or data. ZDR (Groq next step 2) and the D-002 consent questions must be answered before any child uses it.
 
 ## D-004 — Sensitive-disclosure response templates **[safety]**
@@ -268,7 +288,7 @@ Owners are `TBD` until someone is assigned.
 
 ## D-018 — Emoji and formatting in spoken replies **[safety]**
 
-- **Status:** Open
+- **Status:** Proposed: implemented, wording awaiting approval
 - **PRD refs:** §6.2, §7.5, §13
 - **Finding:** 9 of the 18 replies that passed validation in the live run (`live-20261106-2231.md`) contain emoji (🌊 🍕 🌟 🐘 🌙 🎵), and one contains Markdown italics. Nothing in output validation rejects them. Text-to-speech would read them aloud or mispronounce them.
 - **Options:**
@@ -276,7 +296,11 @@ Owners are `TBD` until someone is assigned.
   2. Strip emoji and Markdown after validation. That edits validated text, so it would need its own rule that stripping can only remove characters and the result is validated again.
   3. Tell the system prompt not to use them, and keep option 1 as the enforcement. A prompt alone is not a safety boundary (AGENTS.md).
 - **Recommendation:** Options 1 and 3 together. Option 2 risks becoming "repair" of a failed response.
-- **Decision:** —
+- **Implemented (agent-drafted, unreviewed):** the project owner agreed to options 1 and 3 on 2026-11-13, after emoji were read aloud by the laptop simulator (D-022).
+  - Output rule `not_speakable` in `backend/safety/output_rules.py`: rejects Unicode symbol characters (categories `So` and `Sk`, which cover emoji, pictographs and skin-tone modifiers) and the Markdown marks `*`, `` ` `` and `#`. Maths signs (`+`, `=`) and ordinary punctuation stay allowed.
+  - System prompt line: "Your reply is spoken aloud. Use plain words only: no emoji, symbols, or formatting such as asterisks or lists."
+  - A reply that still has emoji falls back; the prompt line should make that rare. Not yet measured on the adversarial suite.
+- **Decision:** Options 1 and 3 chosen by Anoushka Lalwani, project owner, 2026-11-13. Rule and prompt wording still need her approval.
 
 ## D-019 — Classifier timeout too short for the live judge
 
@@ -324,3 +348,75 @@ Owners are `TBD` until someone is assigned.
   3. Emoji in replies are read aloud by `say` (D-018).
   4. The API app still refuses live mode; only this simulator and the adversarial tool use Groq.
 - **Decision:** —
+
+## D-023 — Winston Wags persona and Groq voice **[safety]**
+
+- **Status:** Proposed: implemented, wording awaiting approval
+- **PRD refs:** §6.2, §7.5, §13
+- **Request (project owner, 2026-11-13):** a voice that sounds human rather than robotic, and a personality: an old dog named Winston Wags, holiday-themed but about holidays generally rather than Christmas, who barks now and then and introduces himself.
+- **Implemented (agent-drafted, unreviewed):**
+  - **Persona:** `SYSTEM_PROMPT` in `backend/conversation/prompts.py`. Winston is a cozy plush toy dog who talks like a gentle old pup, barks now and then, mentions his name, and loves celebrations of every kind without singling out one holiday. He answers the child's question first and adds festive cheer only when it fits. All PRD §6.2 rules stay, and he is told his old-pup charm is pretend: no claims to eat, sleep, have a family, or remember real events.
+  - **Greeting:** template `WINSTON_GREETING` in `backend/safety/templates.py`, spoken once when the simulator starts. It passes the deterministic output rules.
+  - **Voice:** Groq Orpheus (`canopylabs/orpheus-v1-english`, preview), voice `troy` by default, with one fixed vocal direction, `[warm]`, chosen in code. Replies are split at sentence boundaries to fit the 200-character limit without changing words. If the Groq voice fails, the macOS voice says the same text.
+  - **Brackets banned in replies:** output validation now rejects `[` and `]`, so generated text cannot carry its own voice directions.
+  - **Voice replaced by Cartesia (D-024)** after Groq's Orpheus terms could not be accepted; Orpheus stays available with `--speaker groq`.
+- **Risks to check in the next adversarial run:**
+  1. The validator judge's persona and category checks may reject replies that drift into holiday talk or describe Winston like a real dog, causing more fallbacks.
+  2. "Holidays generally" still needs a reviewer's eye for inclusiveness; the prompt avoids naming specific holidays.
+  3. Orpheus is a preview model; reply text (not the child's audio) is sent to Groq, which D-003 allows for adult developer testing only.
+  4. Barking is spoken as words ("Woof!"); Orpheus documents no animal sounds.
+- **First live check, 2026-11-13:** with "1 to 4 sentences", barks, his name and festive cheer pushed replies over the 4-sentence limit, so they fell back (`validation:rejected:too_many_sentences`). The prompt now asks for 2 or 3 sentences, with a bark counting as one, and at most one extra (bark, name or cheer) per reply. After that, 2 of 3 test questions were answered; a riddle still ran too long. The festive cheer can feel forced ("Do you like the sky when you make a birthday cake?") and one bee fact was muddled.
+- **Decision:** Persona and voice requested by Anoushka Lalwani, project owner, 2026-11-13. Prompt, greeting and rule wording still need her approval, and a child-safety reviewer's.
+
+## D-024 — Cartesia for Winston's voice instead of Groq
+
+- **Status:** Proposed: the owner chose it; she marks it Accepted
+- **PRD refs:** §5.1, §5.2
+- **Conflict:** D-016 put every capability on Groq. Groq's Orpheus voice needed terms that the owner's organization could not get accepted, and the owner chose a Cartesia voice (ID `c45bc5ec-dc68-4feb-8829-6e6b2748095d`).
+- **Choice:**
+  - Cartesia `sonic-3.6` through the `/tts/bytes` endpoint is the default voice for the laptop simulator.
+  - Groq Orpheus and the macOS voice remain options. The macOS voice is the backup if Cartesia fails.
+  - Speech-to-text, the AI judge, moderation and reply generation stay on Groq.
+- **Safeguards:**
+  - Only validated reply text or the greeting template is sent to Cartesia.
+  - Output validation rejects `<` and `>` as well as brackets, so generated text can't carry Cartesia's SSML-like tags (`<emotion>`, `<speed>`, `<break>`).
+- **Decision:** Chosen by Anoushka Lalwani, project owner, 2026-11-13, for adult developer testing (D-003). Child use needs the D-003 Cartesia next steps and D-002.
+
+## D-025 — Local Kokoro voice for Winston
+
+- **Status:** Proposed: the owner chose it; she marks it Accepted
+- **PRD refs:** §5.1, §5.2, §9
+- **Context:** The owner wanted a natural voice for Groq's replies without the macOS voice and without another provider's API key. Groq Orpheus is blocked on terms (D-023), and Cartesia needs a key (D-024).
+- **Choice:**
+  - Kokoro-82M runs locally through `kokoro-onnx`. The model is Apache 2.0, the package MIT, and it sits in the optional `voice` dependency group.
+  - Voice `am_michael` (first `bm_fable`), chosen by the owner by ear.
+  - It is the simulator's default when `KOKORO_MODEL_PATH` is set, with the macOS voice as backup.
+  - Model files come from the kokoro-onnx GitHub release `model-files-v1.1`: `kokoro-v1.0.onnx` and `voices-v1.0.bin`. They are downloaded into the git-ignored `models/kokoro/` folder.
+- **Why it suits the product:**
+  - No text or audio leaves the machine for speech, so there are no D-003 terms to meet and no cost.
+  - It takes about 3 s to load and about 1.5 s per reply on an Apple-silicon laptop.
+  - Whether it runs fast enough on a Raspberry Pi is an M4 question.
+- **Decision:** Kokoro with `bm_fable` chosen by Anoushka Lalwani, project owner, 2026-11-13.
+- **Update 2026-11-16:** after previewing six voices, the owner switched Winston to `am_michael` (American English, warm male, graded C+).
+
+## D-026 — Running the whole simulator on a Raspberry Pi, keys included **[safety]**
+
+- **Status:** Proposed: the owner's choice; it is an exception to a project rule
+- **PRD refs:** §4.1, §9, §14 (M4)
+- **Conflict:** AGENTS.md and PRD §9 say provider API keys never go on the device. The owner chose to run the full laptop simulator on a Raspberry Pi (4 or 5) for adult developer testing. That means the Pi's `.env` holds the Groq key. The owner was offered the alternative (the Pi as a thin device talking to a backend on the laptop) and chose this instead.
+- **Setup chosen by the owner, 2026-11-16:**
+  - Everything runs on the Pi.
+  - Winston's voice is made on the Pi by Kokoro (D-025).
+  - Questions come in through a USB microphone, and replies play through a USB speaker (an LLR054 plug-and-play USB speaker).
+- **Conditions for the exception:**
+  1. Adult developer testing only (D-003). No child uses this Pi.
+  2. The Pi stays physically with the developer. Its `.env` is never committed or copied anywhere else.
+  3. Revoke and replace the Groq key if the Pi or its SD card leaves the developer's hands.
+  4. Before any child uses a Pi, it must become a thin device client with no keys, talking to a backend (the PRD design). That is still M4/M5 work.
+- **Code changes:**
+  - Audio devices can be chosen by name.
+  - Playback and recording adapt to the sample rates USB devices support.
+  - The backup voice is espeak-ng on Linux and `say` on macOS.
+  - The thinking chime is generated in memory on both.
+  - Nothing here changes the safety pipeline.
+- **Decision:** Chosen by Anoushka Lalwani, project owner, 2026-11-16, for adult developer testing only. She marks it Accepted; a child-safety reviewer should see it before the pilot.

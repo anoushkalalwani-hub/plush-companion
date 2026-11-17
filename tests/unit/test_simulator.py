@@ -123,7 +123,7 @@ def test_simulator_without_groq_settings_exits_before_any_network_call(monkeypat
     ):
         monkeypatch.delenv(name, raising=False)
     assert main(["--type"]) == 2
-    assert "Missing Groq settings" in capsys.readouterr().err
+    assert "Missing settings" in capsys.readouterr().err
 
 
 def test_simulator_refuses_an_out_of_range_threshold():
@@ -133,3 +133,13 @@ def test_simulator_refuses_an_out_of_range_threshold():
 
     with pytest.raises(SystemExit):
         main(["--type", "--threshold", "2"])
+
+
+def test_cartesia_is_requested_without_a_key_only_by_flag(monkeypatch, capsys):
+    from device.simulator.__main__ import main
+
+    monkeypatch.delenv("CARTESIA_API_KEY", raising=False)
+    for name in ("GROQ_API_KEY", "GROQ_CHAT_MODEL", "GROQ_JUDGE_MODEL", "GROQ_MODERATION_MODEL"):
+        monkeypatch.setenv(name, "x")
+    assert main(["--type", "--speaker", "cartesia"]) == 2
+    assert "CARTESIA_API_KEY" in capsys.readouterr().err
