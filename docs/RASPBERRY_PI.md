@@ -24,13 +24,48 @@ Close and reopen the terminal so `uv` is on your PATH.
 
 ## 3. The code
 
+Use either option A or option B. Both end with a `plush-companion` folder in your home folder.
+
+### Option A: git clone
+
 ```bash
-git clone https://github.com/anoushkalalwani-hub/plush-companion.git
+cd ~ && git clone https://github.com/anoushkalalwani-hub/plush-companion.git
 ```
 
 ```bash
 cd plush-companion && git switch m3a-terminal-voice
 ```
+
+If git asks for a password and fails, use option B.
+
+### Option B: download a ZIP
+
+The repository is private, so the download needs a browser that is signed in to GitHub. Use the Pi's browser, or your laptop's browser and then copy the file to the Pi on a USB stick.
+
+1. Open this link. It downloads the `m3a-terminal-voice` branch, which has the voice and Pi code:
+   https://github.com/anoushkalalwani-hub/plush-companion/archive/refs/heads/m3a-terminal-voice.zip
+
+   Don't use the green **Code → Download ZIP** button on the main page. It downloads `main`, which doesn't have this code yet.
+2. Put the ZIP in the Pi's `Downloads` folder (the Pi's browser saves it there).
+3. Unzip it into your home folder:
+
+```bash
+cd ~ && unzip ~/Downloads/plush-companion-m3a-terminal-voice.zip
+```
+
+4. Rename the folder so the rest of this guide works:
+
+```bash
+mv ~/plush-companion-m3a-terminal-voice ~/plush-companion
+```
+
+```bash
+cd ~/plush-companion
+```
+
+To update later, download and unzip a new ZIP the same way. Before you delete the old folder, move `.env` and `models/` into the new one, so you don't have to repeat steps 4 and 5.
+
+### Then, for either option
 
 ```bash
 uv sync --group voice
